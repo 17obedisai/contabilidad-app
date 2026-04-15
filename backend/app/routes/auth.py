@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from bson import ObjectId
 from app.db.connection import get_database
-from app.core.security import verify_password, create_access_token
+from app.core.security import verify_password, hash_password, create_access_token
+from app.core.dependencies import verify_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -34,3 +36,34 @@ async def login(body: LoginRequest):
     })
 
     return LoginResponse(access_token=token)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.put("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    body: ChangePasswordRequest,
+    token: dict = Depends(verify_token),
+):
+    if len(body.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La nueva contraseña debe tener al menos 6 caracteres",
+        )
+
+    db = get_database()
+    user = await db.users.find_one({"_id": ObjectId(token["userId"])})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+
+    if not verify_password(body.current_password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contraseña actual incorrecta",
+        )
+
+    new_hash = hash_password(body.new_password)
+    await db.users.update_one({"_id": ObjectId(token["userId"])}, {"$set": {"password_hash": new_hash}})

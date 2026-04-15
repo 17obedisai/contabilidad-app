@@ -10,5 +10,4 @@ export const TEAM = [
   { nick: "nevis",    name: "Nevis",          role: "Aux. Proveedores",       emoji: "🏪",  level: 4, isCont: false, noQuiz: false },
   { nick: "karen",    name: "Karen",          role: "Aux. Puntos Venta",      emoji: "🛒",  level: 4, isCont: false, noQuiz: false },
   { nick: "obed",     name: "Obed",           role: "Pasante SENA",           emoji: "💻",  level: 5, isCont: false, noQuiz: true  },
-  { nick: "nelson",   name: "Nelson",         role: "Asist. Contable",        emoji: "📋",  level: 3, isCont: false, noQuiz: false },
 ]
