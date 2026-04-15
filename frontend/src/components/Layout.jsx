@@ -8,7 +8,7 @@ import { G, DG, BG, BD } from "../constants/theme"
 const TABS = [
   { path: "/eval",    label: "📊 Evaluación"    },
   { path: "/prod",    label: "⚡ Productividad"  },
-  { path: "/board",   label: "📌 Tablero"        },
+  { path: "/board",   label: "📌 Tareas"          },
   { path: "/quiz",    label: "☕ Quiz"           },
   { path: "/ranking", label: "🏆 Ranking"        },
 ]

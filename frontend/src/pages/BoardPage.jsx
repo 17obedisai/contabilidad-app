@@ -23,7 +23,8 @@ const PRIORITIES = {
 function autoProgress(status) {
   if (status === "pendiente")   return 0
   if (status === "completada")  return 100
-  return null  // en_progreso: keep current
+  if (status === "en_progreso") return 40
+  return null
 }
 
 export default function BoardPage() {
@@ -37,6 +38,7 @@ export default function BoardPage() {
   const [expandedHistory, setExpandedHistory] = useState({})
   const [form, setForm] = useState({ title:"", desc:"", priority:"media", assignedTo:"" })
   const [editObs, setEditObs]     = useState({})  // itemId → obs string
+  const [saving, setSaving]       = useState({})  // itemId → true while saving
 
   useEffect(() => {
     api.get("/api/board").then(res => { setItems(res.data); setLoading(false) })
@@ -56,14 +58,33 @@ export default function BoardPage() {
     try {
       const res = await api.put(`/api/board/${itemId}`, patch)
       setItems(prev => prev.map(it => it.id === itemId ? res.data : it))
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error("Error updating board item:", err?.response?.data || err.message)
+    }
   }
 
   async function changeStatus(item, newStatus) {
+    if (item.status === newStatus) return
+    setSaving(prev => ({ ...prev, [item.id]: true }))
     const patch = { status: newStatus }
     const auto  = autoProgress(newStatus)
     if (auto !== null) patch.progress = auto
-    await updateItem(item.id, patch)
+    // Optimistic update for instant feedback
+    setItems(prev => prev.map(it =>
+      it.id === item.id ? { ...it, status: newStatus, progress: auto ?? it.progress } : it
+    ))
+    try {
+      const res = await api.put(`/api/board/${item.id}`, patch)
+      setItems(prev => prev.map(it => it.id === item.id ? res.data : it))
+    } catch (err) {
+      console.error("Error changing status:", err?.response?.data || err.message)
+      // Revert on failure
+      setItems(prev => prev.map(it =>
+        it.id === item.id ? { ...it, status: item.status, progress: item.progress } : it
+      ))
+    } finally {
+      setSaving(prev => { const n = { ...prev }; delete n[item.id]; return n })
+    }
   }
 
   async function saveObservation(item) {
@@ -85,7 +106,9 @@ export default function BoardPage() {
       setItems(prev => [...prev, res.data])
       setForm({ title:"", desc:"", priority:"media", assignedTo:"" })
       setShowForm(false)
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error("Error creating board item:", err?.response?.data || err.message)
+    }
   }
 
   async function deleteItem(itemId) {
@@ -93,7 +116,9 @@ export default function BoardPage() {
     try {
       await api.delete(`/api/board/${itemId}`)
       setItems(prev => prev.filter(it => it.id !== itemId))
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error("Error deleting board item:", err?.response?.data || err.message)
+    }
   }
 
   const columns = STATUSES.map(s => ({
@@ -233,15 +258,30 @@ export default function BoardPage() {
                           <div style={{ marginTop: 10 }}>
                             <div style={{ fontSize: 11, color:"#aaa", marginBottom: 4 }}>Estado</div>
                             <div style={{ display:"flex", gap: 4 }}>
-                              {STATUSES.map(s => (
-                                <button key={s.key} onClick={() => changeStatus(item, s.key)} style={{
-                                  flex: 1, padding:"4px 0", fontSize: 11, borderRadius: 6,
-                                  border:`1px solid ${item.status===s.key ? s.color : BD}`,
-                                  background: item.status===s.key ? s.color : "#fff",
-                                  color: item.status===s.key ? "#fff" : "#888",
-                                  cursor:"pointer", fontWeight: item.status===s.key ? 700 : 400,
-                                }}>{s.label.split(" ")[0]}</button>
-                              ))}
+                              {STATUSES.map(s => {
+                                const isActive = item.status === s.key
+                                const isSaving = saving[item.id]
+                                return (
+                                  <button
+                                    type="button"
+                                    key={s.key}
+                                    disabled={isSaving}
+                                    onClick={() => changeStatus(item, s.key)}
+                                    style={{
+                                      flex: 1, padding:"4px 0", fontSize: 11, borderRadius: 6,
+                                      border:`1px solid ${isActive ? s.color : BD}`,
+                                      background: isActive ? s.color : "#fff",
+                                      color: isActive ? "#fff" : "#888",
+                                      cursor: isSaving ? "wait" : "pointer",
+                                      fontWeight: isActive ? 700 : 400,
+                                      opacity: isSaving ? 0.6 : 1,
+                                      transition: "all 0.2s ease",
+                                    }}
+                                  >
+                                    {s.label.split(" ")[0]}
+                                  </button>
+                                )
+                              })}
                             </div>
                           </div>
                         )}

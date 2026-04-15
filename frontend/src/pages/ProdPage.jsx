@@ -2,11 +2,17 @@ import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
 import api from "../services/api"
 import Layout from "../components/Layout"
-import ProgressBar from "../components/ui/ProgressBar"
-import Card from "../components/ui/Card"
+import SectionCard from "../components/ui/SectionCard"
+import Gauge from "../components/ui/Gauge"
+import ThickBar from "../components/ui/ThickBar"
+import ScoreChip from "../components/ui/ScoreChip"
 import Button from "../components/ui/Button"
-import { G, DG, LG, BD, GO, scoreColor, inputStyle } from "../constants/theme"
 import { TEAM } from "../constants/team"
+import { colors, radius, shadows, typography, inputStyle, utilColor } from "../constants/tokens"
+import {
+  Target, TrendingUp, Clock, ListChecks, Plus, X,
+  Users, ChevronDown, User, Briefcase, CalendarClock, Hash
+} from "lucide-react"
 
 const HM = 190
 const FREQ_MULT = { diaria: 22, semanal: 4.33, mensual: 1 }
@@ -17,14 +23,10 @@ function taskHours(t) {
 function taskActual(t) {
   return (t.hoursActual ?? t.hoursEstimated ?? 0) * (FREQ_MULT[t.freq] ?? 1)
 }
-function utilColor(pct) {
-  if (pct >= 90) return "#27ae60"
-  if (pct >= 70) return GO
-  return "#e74c3c"
-}
 
 const FREQ_LABELS = { diaria: "Diaria", semanal: "Semanal", mensual: "Mensual" }
 const TYPE_LABELS  = { contable: "Contable", administrativa: "Administrativa", operativa: "Operativa", otra: "Otra" }
+const TYPE_ICONS = { contable: Briefcase, administrativa: ListChecks, operativa: Target, otra: Hash }
 
 export default function ProdPage() {
   const { user } = useAuth()
@@ -98,175 +100,340 @@ export default function ProdPage() {
     } catch { /* ignore */ }
   }
 
+  const selectedProfile = teamUsers.length
+    ? TEAM.find(t => t.nick === teamUsers.find(u => u.id === selectedId)?.nick)
+    : TEAM.find(t => t.nick === user?.nick)
+
   return (
     <Layout>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      <div style={{
+        maxWidth: 960, margin: "0 auto",
+        display: "flex", flexDirection: "column", gap: 20,
+      }}>
 
+        {/* Employee selector (contadora only) */}
         {isCont && (
-          <Card style={{ marginBottom: 16, padding: "12px 16px" }}>
-            <div style={{ fontSize: 12, color:"#888", marginBottom: 8 }}>Empleado</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap: 8 }}>
+          <SectionCard icon={Users} title="Empleado" style={{ padding: "16px 20px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {teamUsers.map(u => {
                 const p = TEAM.find(t => t.nick === u.nick)
+                const isActive = selectedId === u.id
                 return (
                   <button key={u.id} onClick={() => setSelectedId(u.id)} style={{
-                    display:"flex", alignItems:"center", gap: 6, padding:"6px 14px",
-                    borderRadius: 20, border:`2px solid ${selectedId===u.id ? G : BD}`,
-                    background: selectedId===u.id ? LG : "#fff", cursor:"pointer",
-                    fontSize: 13, color: selectedId===u.id ? DG : "#555",
+                    display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
+                    borderRadius: 20, cursor: "pointer", fontSize: 13,
+                    border: `2px solid ${isActive ? colors.brandPine : colors.border}`,
+                    background: isActive ? colors.brandPineLt : colors.bgCard,
+                    color: isActive ? colors.brandPine : colors.textBody,
+                    fontWeight: isActive ? 700 : 500,
+                    transition: "all 0.2s ease",
                   }}>
-                    <span>{p?.emoji}</span><span>{u.nick}</span>
+                    <User size={14} />
+                    <span>{u.nick}</span>
                   </button>
                 )
               })}
             </div>
-          </Card>
+          </SectionCard>
         )}
 
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+        {/* Summary metric cards — Bento grid */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 16,
+        }}>
           {[
-            { label:"Horas Estimadas", value:`${totalEst.toFixed(1)} h`, sub:`${estPct.toFixed(0)}% de ${HM}h`, color: scoreColor(estPct > 110 ? 60 : estPct > 90 ? 90 : 70) },
-            { label:"Horas Reales",    value:`${totalActual.toFixed(1)} h`, sub:`${utilPct.toFixed(0)}% utilización`, color: utilColor(utilPct) },
-            { label:"Tareas Activas",  value: tasks.length, sub:"registradas", color: DG },
-          ].map(({ label, value, sub, color }) => (
-            <Card key={label} style={{ textAlign:"center", padding:"16px 12px" }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color }}>{value}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: DG, marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 11, color:"#888" }}>{sub}</div>
-            </Card>
+            {
+              icon: Clock,
+              label: "Horas Estimadas",
+              value: `${totalEst.toFixed(1)}h`,
+              sub: `${estPct.toFixed(0)}% de ${HM}h`,
+              color: utilColor(estPct > 110 ? 55 : estPct > 90 ? 92 : 72),
+            },
+            {
+              icon: TrendingUp,
+              label: "Horas Reales",
+              value: `${totalActual.toFixed(1)}h`,
+              sub: `${utilPct.toFixed(0)}% utilización`,
+              color: utilColor(utilPct),
+            },
+            {
+              icon: ListChecks,
+              label: "Tareas Activas",
+              value: tasks.length,
+              sub: "registradas",
+              color: colors.brandPine,
+            },
+          ].map(({ icon: Icon, label, value, sub, color }) => (
+            <div key={label} style={{
+              background: colors.bgCard,
+              borderRadius: radius.xl,
+              padding: "24px 20px",
+              boxShadow: shadows.md,
+              textAlign: "center",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: radius.md,
+                background: `${color}12`, display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Icon size={20} color={color} strokeWidth={2.5} />
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color }}>{value}</div>
+              <div style={{ ...typography.labelStyle }}>{label}</div>
+              <div style={{ fontSize: 12, color: colors.textLabel }}>{sub}</div>
+            </div>
           ))}
         </div>
 
-        <Card style={{ marginBottom: 16, padding:"14px 16px" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: DG }}>Utilización del mes</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: utilColor(utilPct) }}>{utilPct.toFixed(1)}%</span>
+        {/* Utilization gauge + bar */}
+        <SectionCard icon={Target} title="Utilización del mes">
+          <div style={{
+            display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
+          }}>
+            <Gauge value={utilPct} size={110} label="Utilización" color={utilColor(utilPct)} />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <ThickBar value={Math.min(utilPct, 100)} color={utilColor(utilPct)} height={14} />
+              <div style={{
+                display: "flex", justifyContent: "space-between", marginTop: 8,
+                fontSize: 12, color: colors.textLabel,
+              }}>
+                <span>Base {HM} h/mes</span>
+                <span>Real {totalActual.toFixed(1)} h</span>
+                <span>Estimado {totalEst.toFixed(1)} h</span>
+              </div>
+            </div>
           </div>
-          <ProgressBar value={Math.min(utilPct, 100)} color={utilColor(utilPct)} />
-          <div style={{ fontSize: 11, color:"#888", marginTop: 4 }}>
-            Base {HM} h/mes · Real {totalActual.toFixed(1)} h · Estimado {totalEst.toFixed(1)} h
-          </div>
-        </Card>
+        </SectionCard>
 
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderBottom:`1px solid ${BD}` }}>
-            <span style={{ fontWeight: 700, color: DG }}>Tareas</span>
+        {/* Task list */}
+        <SectionCard style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "18px 20px", borderBottom: `1px solid ${colors.border}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <ListChecks size={20} color={colors.brandPine} strokeWidth={2.5} />
+              <span style={{ fontWeight: 800, color: colors.textTitle, fontSize: 16 }}>Tareas</span>
+              <span style={{
+                background: colors.bgPrimary, padding: "2px 10px", borderRadius: 20,
+                fontSize: 12, fontWeight: 700, color: colors.textLabel,
+              }}>{tasks.length}</span>
+            </div>
             {isCont && (
-              <Button onClick={() => setShowForm(v => !v)} style={{ padding:"8px 14px", fontSize:12, minHeight:32 }}>
-                {showForm ? "Cancelar" : "+ Agregar"}
-              </Button>
+              <button
+                type="button"
+                onClick={() => setShowForm(v => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", borderRadius: radius.md,
+                  border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                  background: showForm ? colors.danger + "15" : colors.brandPine + "12",
+                  color: showForm ? colors.danger : colors.brandPine,
+                  transition: "all 0.2s",
+                }}
+              >
+                {showForm ? <X size={14} /> : <Plus size={14} />}
+                {showForm ? "Cancelar" : "Agregar"}
+              </button>
             )}
           </div>
 
           {showForm && isCont && (
-            <div style={{ padding:"12px 16px", background: LG, borderBottom:`1px solid ${BD}`, display:"flex", flexWrap:"wrap", gap: 8, alignItems:"flex-end" }}>
-              <div style={{ flex:"2 1 180px" }}>
-                <div style={{ fontSize: 11, color:"#888", marginBottom: 3 }}>Título</div>
+            <div style={{
+              padding: "16px 20px", background: colors.bgSecondary,
+              borderBottom: `1px solid ${colors.border}`,
+              display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end",
+            }}>
+              <div style={{ flex: "2 1 180px" }}>
+                <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Título</div>
                 <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="Nombre..." style={{ ...inputStyle, width:"100%" }} />
+                  placeholder="Nombre..." style={{ ...inputStyle }} />
               </div>
-              <div style={{ flex:"1 1 110px" }}>
-                <div style={{ fontSize: 11, color:"#888", marginBottom: 3 }}>Frecuencia</div>
-                <select value={form.freq} onChange={e => setForm(f => ({ ...f, freq: e.target.value }))} style={{ ...inputStyle, width:"100%" }}>
+              <div style={{ flex: "1 1 110px" }}>
+                <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Frecuencia</div>
+                <select value={form.freq} onChange={e => setForm(f => ({ ...f, freq: e.target.value }))} style={{ ...inputStyle }}>
                   {Object.entries(FREQ_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
-              <div style={{ flex:"1 1 110px" }}>
-                <div style={{ fontSize: 11, color:"#888", marginBottom: 3 }}>Tipo</div>
-                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ ...inputStyle, width:"100%" }}>
+              <div style={{ flex: "1 1 110px" }}>
+                <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Tipo</div>
+                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ ...inputStyle }}>
                   {Object.entries(TYPE_LABELS).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
-              <div style={{ flex:"0 1 90px" }}>
-                <div style={{ fontSize: 11, color:"#888", marginBottom: 3 }}>Horas est.</div>
+              <div style={{ flex: "0 1 90px" }}>
+                <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Horas est.</div>
                 <input type="number" min="0.5" step="0.5" value={form.hoursEstimated}
                   onChange={e => setForm(f => ({ ...f, hoursEstimated: Number(e.target.value) }))}
-                  style={{ ...inputStyle, width:"100%" }} />
+                  style={{ ...inputStyle }} />
               </div>
-              <Button onClick={addTask}>Guardar</Button>
+              <button
+                type="button"
+                onClick={addTask}
+                style={{
+                  padding: "10px 20px", borderRadius: radius.md,
+                  border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700,
+                  background: colors.brandPine, color: "#fff",
+                }}
+              >
+                Guardar
+              </button>
             </div>
           )}
 
           {loading ? (
-            <div style={{ textAlign:"center", padding: 32, color:"#888" }}>Cargando...</div>
+            <div style={{ textAlign: "center", padding: 40, color: colors.textLabel }}>
+              Cargando...
+            </div>
           ) : tasks.length === 0 ? (
-            <div style={{ textAlign:"center", padding: 32, color:"#aaa", fontSize: 14 }}>Sin tareas registradas</div>
+            <div style={{ textAlign: "center", padding: 40, color: colors.textLabel, fontSize: 14 }}>
+              Sin tareas registradas
+            </div>
           ) : (
-            tasks.map(t => {
+            tasks.map((t, idx) => {
               const mult = FREQ_MULT[t.freq] ?? 1
               const estH = (t.hoursEstimated ?? 0) * mult
               const actH = (t.hoursActual ?? t.hoursEstimated ?? 0) * mult
               const pct  = estH > 0 ? Math.min((actH / estH) * 100, 150) : 100
+              const TypeIcon = TYPE_ICONS[t.type] || Hash
               return (
-                <div key={t.id} style={{ padding:"10px 16px", borderBottom:`1px solid ${BD}`, display:"flex", alignItems:"center", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: DG }}>{t.title}</div>
-                    <div style={{ fontSize: 11, color:"#888", marginTop: 2 }}>
-                      {FREQ_LABELS[t.freq] ?? t.freq} · {TYPE_LABELS[t.type] ?? t.type} ·{" "}
-                      {estH.toFixed(1)} h/mes est · {actH.toFixed(1)} h/mes real
+                <div key={t.id} style={{
+                  padding: "14px 20px",
+                  borderBottom: idx < tasks.length - 1 ? `1px solid ${colors.borderLight}` : "none",
+                  display: "flex", alignItems: "center", gap: 14,
+                  transition: "background 0.15s",
+                }}>
+                  {/* Type icon */}
+                  <div style={{
+                    width: 36, height: 36, borderRadius: radius.sm,
+                    background: `${colors.brandPine}10`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <TypeIcon size={16} color={colors.brandPine} />
+                  </div>
+
+                  {/* Task info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 14, fontWeight: 700, color: colors.textTitle,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                      {t.title || t.type}
                     </div>
-                    <div style={{ marginTop: 5 }}>
-                      <ProgressBar value={Math.min(pct, 100)} color={utilColor(pct)} height={4} />
+                    <div style={{ fontSize: 12, color: colors.textLabel, marginTop: 2, display: "flex", gap: 8, alignItems: "center" }}>
+                      <CalendarClock size={11} />
+                      <span>{FREQ_LABELS[t.freq] ?? t.freq}</span>
+                      <span style={{ color: colors.border }}>|</span>
+                      <span>{TYPE_LABELS[t.type] ?? t.type}</span>
+                      <span style={{ color: colors.border }}>|</span>
+                      <span>{estH.toFixed(1)} h/mes est</span>
+                      <span style={{ color: colors.border }}>|</span>
+                      <span style={{ fontWeight: 600, color: utilColor(pct) }}>{actH.toFixed(1)} h/mes real</span>
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <ThickBar value={Math.min(pct, 100)} color={utilColor(pct)} height={5} showLabel={false} />
                     </div>
                   </div>
-                  <div style={{ display:"flex", gap: 6, alignItems:"center" }}>
+
+                  {/* Hour inputs */}
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                     {isCont && (
-                      <div style={{ textAlign:"center" }}>
-                        <div style={{ fontSize: 10, color:"#aaa", marginBottom: 2 }}>Est</div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ ...typography.labelStyle, marginBottom: 3, fontSize: 10 }}>Est</div>
                         <input type="number" min="0" step="0.5" value={t.hoursEstimated ?? 0}
                           onChange={e => updateHours(t.id, "hoursEstimated", e.target.value)}
-                          style={{ ...inputStyle, width: 60, textAlign:"center" }} />
+                          style={{ ...inputStyle, width: 58, textAlign: "center", padding: "6px 4px", fontSize: 13 }} />
                       </div>
                     )}
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ fontSize: 10, color:"#aaa", marginBottom: 2 }}>Real</div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ ...typography.labelStyle, marginBottom: 3, fontSize: 10 }}>Real</div>
                       <input type="number" min="0" step="0.5" value={t.hoursActual ?? 0}
                         onChange={e => updateHours(t.id, "hoursActual", e.target.value)}
-                        style={{ ...inputStyle, width: 60, textAlign:"center" }} />
+                        style={{ ...inputStyle, width: 58, textAlign: "center", padding: "6px 4px", fontSize: 13 }} />
                     </div>
                   </div>
+
                   {isCont && (
-                    <button onClick={() => deleteTask(t.id)} style={{
-                      background:"none", border:"none", cursor:"pointer", color:"#ccc", fontSize: 16, padding:"4px 6px"
-                    }} title="Eliminar">✕</button>
+                    <button
+                      type="button"
+                      onClick={() => deleteTask(t.id)}
+                      title="Eliminar"
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: colors.textLabel, padding: 4, borderRadius: radius.sm,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "color 0.2s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = colors.danger}
+                      onMouseLeave={e => e.currentTarget.style.color = colors.textLabel}
+                    >
+                      <X size={16} />
+                    </button>
                   )}
                 </div>
               )
             })
           )}
-        </Card>
+        </SectionCard>
 
+        {/* Team utilization (contadora view) */}
         {isCont && Object.keys(teamTasks).length > 0 && (
-          <Card>
-            <div style={{ padding:"12px 16px", borderBottom:`1px solid ${BD}`, fontWeight: 700, color: DG }}>
-              Utilización del Equipo
-            </div>
-            <div style={{ padding: 16, display:"flex", flexDirection:"column", gap: 10 }}>
+          <SectionCard icon={Users} title="Utilización del Equipo">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {teamUsers.map(u => {
                 const uTasks = teamTasks[u.id] ?? []
                 const act    = uTasks.reduce((s, t) => s + taskActual(t), 0)
                 const pct    = Math.min((act / HM) * 100, 150)
                 const p      = TEAM.find(t => t.nick === u.nick)
+                const isSelected = u.id === selectedId
                 return (
-                  <div key={u.id} style={{ display:"flex", alignItems:"center", gap: 12 }}>
-                    <div style={{ width: 28, textAlign:"center", fontSize: 20 }}>{p?.emoji}</div>
-                    <div style={{ width: 80, fontSize: 13, color: DG, fontWeight: 600 }}>{u.nick}</div>
-                    <div style={{ flex: 1 }}>
-                      <ProgressBar value={Math.min(pct, 100)} color={utilColor(pct)} height={8} />
+                  <button
+                    type="button"
+                    key={u.id}
+                    onClick={() => setSelectedId(u.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 14,
+                      padding: "10px 14px", borderRadius: radius.md,
+                      border: `2px solid ${isSelected ? colors.brandPine : "transparent"}`,
+                      background: isSelected ? colors.brandPineLt : "transparent",
+                      cursor: "pointer", transition: "all 0.2s",
+                    }}
+                  >
+                    <div style={{
+                      width: 32, height: 32, borderRadius: "50%",
+                      background: colors.bgPrimary, display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <User size={16} color={colors.brandPine} />
                     </div>
-                    <div style={{ width: 50, textAlign:"right", fontSize: 13, fontWeight: 700, color: utilColor(pct) }}>
+                    <div style={{
+                      width: 80, fontSize: 13, color: colors.textTitle,
+                      fontWeight: 600, textAlign: "left",
+                    }}>
+                      {u.nick}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <ThickBar value={Math.min(pct, 100)} color={utilColor(pct)} height={8} showLabel={false} />
+                    </div>
+                    <div style={{
+                      width: 50, textAlign: "right", fontSize: 13,
+                      fontWeight: 700, color: utilColor(pct),
+                    }}>
                       {pct.toFixed(0)}%
                     </div>
-                    <div style={{ width: 70, textAlign:"right", fontSize: 11, color:"#888" }}>
+                    <div style={{
+                      width: 70, textAlign: "right", fontSize: 11, color: colors.textLabel,
+                    }}>
                       {act.toFixed(0)}/{HM} h
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
-          </Card>
+          </SectionCard>
         )}
-
       </div>
     </Layout>
   )
