@@ -5,6 +5,8 @@ import Layout from "../components/Layout"
 import Card from "../components/ui/Card"
 import RadialScore from "../components/ui/RadialScore"
 import ProgressBar from "../components/ui/ProgressBar"
+import { SkeletonRow } from "../components/ui/Skeleton"
+import Skeleton from "../components/ui/Skeleton"
 import { G, DG, LG, BD, GO, scoreColor } from "../constants/theme"
 
 const YEAR  = new Date().getFullYear()
@@ -64,7 +66,14 @@ export default function RankingPage() {
           </div>
 
           {loading ? (
-            <div style={{ textAlign:"center", padding: 48, color:"#888" }}>Cargando...</div>
+            <div>
+              <div style={{ display:"flex", justifyContent:"center", gap: 20, padding: 24, alignItems:"flex-end" }}>
+                <Skeleton shape="rect" width={80} height={90} />
+                <Skeleton shape="rect" width={80} height={120} />
+                <Skeleton shape="rect" width={80} height={70} />
+              </div>
+              <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
+            </div>
           ) : ranking.length === 0 ? (
             <div style={{ textAlign:"center", padding: 48, color:"#aaa", fontSize: 14 }}>
               Sin datos disponibles
@@ -153,7 +162,9 @@ export default function RankingPage() {
           </div>
 
           {monthLoading ? (
-            <div style={{ textAlign:"center", padding: 32, color:"#888" }}>Cargando...</div>
+            <div>
+              <SkeletonRow /><SkeletonRow /><SkeletonRow />
+            </div>
           ) : monthResults.length === 0 ? (
             <div style={{ textAlign:"center", padding: 32, color:"#aaa", fontSize: 14 }}>
               Sin resultados para {MF[month-1]}

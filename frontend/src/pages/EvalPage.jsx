@@ -9,6 +9,8 @@ import RatingButtons from "../components/ui/RatingButtons"
 import Counter from "../components/ui/Counter"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
+import { SkeletonRow } from "../components/ui/Skeleton"
+import Skeleton from "../components/ui/Skeleton"
 import { G, DG, LG, scoreColor, scoreLabel, inputStyle } from "../constants/theme"
 import { EVAL_CATS, EV_ITEMS, calcMetric, catScore, computeMonthScore, computeYearScore } from "../utils/evalScores"
 
@@ -160,8 +162,15 @@ export default function EvalPage() {
       </div>
 
       {loading ? (
-        <Card style={{ textAlign: "center", padding: 40, color: "#aaa" }}>
-          Cargando evaluaciones…
+        <Card style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 8 }}>
+            <div style={{ borderRadius: 16, overflow: "hidden", height: 100 }}><Skeleton height={100} /></div>
+            <div style={{ borderRadius: 16, overflow: "hidden", height: 100 }}><Skeleton height={100} /></div>
+          </div>
+          <SkeletonRow withAvatar={false} />
+          <SkeletonRow withAvatar={false} />
+          <SkeletonRow withAvatar={false} />
+          <SkeletonRow withAvatar={false} />
         </Card>
       ) : !selectedId ? (
         <Card style={{ textAlign: "center", padding: 40, color: "#aaa" }}>

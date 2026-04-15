@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { useAuth } from "../context/AuthContext"
 import api from "../services/api"
 import Layout from "../components/Layout"
@@ -7,6 +8,8 @@ import Gauge from "../components/ui/Gauge"
 import ThickBar from "../components/ui/ThickBar"
 import ScoreChip from "../components/ui/ScoreChip"
 import Button from "../components/ui/Button"
+import ConfirmModal from "../components/ui/ConfirmModal"
+import { SkeletonRow, SkeletonMetricCard } from "../components/ui/Skeleton"
 import { TEAM } from "../constants/team"
 import { colors, radius, shadows, typography, inputStyle, utilColor } from "../constants/tokens"
 import {
@@ -39,6 +42,7 @@ export default function ProdPage() {
   const [loading, setLoading]       = useState(false)
   const [showForm, setShowForm]     = useState(false)
   const [form, setForm]             = useState({ title:"", freq:"mensual", type:"contable", hoursEstimated:1 })
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState(null)
 
   useEffect(() => {
     if (!isCont) return
@@ -93,11 +97,15 @@ export default function ProdPage() {
   }
 
   async function deleteTask(taskId) {
-    if (!window.confirm("¿Eliminar esta tarea?")) return
     try {
       await api.delete(`/api/tasks/${taskId}`)
       setTasks(prev => prev.filter(t => t.id !== taskId))
-    } catch { /* ignore */ }
+      toast.success("Tarea eliminada")
+    } catch {
+      toast.error("No se pudo eliminar la tarea")
+    } finally {
+      setConfirmDeleteTask(null)
+    }
   }
 
   const selectedProfile = teamUsers.length
@@ -284,8 +292,8 @@ export default function ProdPage() {
           )}
 
           {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: colors.textLabel }}>
-              Cargando...
+            <div style={{ padding: "8px 0" }}>
+              <SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow />
             </div>
           ) : tasks.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: colors.textLabel, fontSize: 14 }}>
@@ -359,7 +367,7 @@ export default function ProdPage() {
                   {isCont && (
                     <button
                       type="button"
-                      onClick={() => deleteTask(t.id)}
+                      onClick={() => setConfirmDeleteTask(t.id)}
                       title="Eliminar"
                       style={{
                         background: "none", border: "none", cursor: "pointer",
@@ -435,6 +443,16 @@ export default function ProdPage() {
           </SectionCard>
         )}
       </div>
+
+      <ConfirmModal
+        open={!!confirmDeleteTask}
+        title="Eliminar tarea"
+        message="¿Eliminar esta tarea permanentemente? No se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+        onConfirm={() => deleteTask(confirmDeleteTask)}
+        onCancel={() => setConfirmDeleteTask(null)}
+      />
     </Layout>
   )
 }

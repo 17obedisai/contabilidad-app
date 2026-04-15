@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { Users, Plus, Pencil, Trash2, X, Check, UserPlus, Shield, User } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import api from "../services/api"
 import Layout from "../components/Layout"
 import SectionCard from "../components/ui/SectionCard"
 import Modal from "../components/ui/Modal"
+import ConfirmModal from "../components/ui/ConfirmModal"
+import { SkeletonRow } from "../components/ui/Skeleton"
 import { TEAM } from "../constants/team"
 import { colors, radius, shadows, typography, inputStyle } from "../constants/tokens"
 
@@ -44,6 +47,7 @@ export default function TeamPage() {
   const [newForm, setNewForm]       = useState(EMPTY_FORM)
   const [newError, setNewError]     = useState("")
   const [saving, setSaving]         = useState(false)
+  const [confirmDeleteMember, setConfirmDeleteMember] = useState(null) // { id, name }
 
   // Guard: only contadora
   if (!user?.isCont) {
@@ -99,21 +103,24 @@ export default function TeamPage() {
       const res = await api.put(`/api/users/${id}`, editForm)
       setMembers(prev => prev.map(m => m.id === id ? res.data : m))
       setEditId(null)
+      toast.success("Cambios guardados")
     } catch (err) {
-      console.error(err?.response?.data || err.message)
+      toast.error(err?.response?.data?.detail || "Error al guardar")
     } finally {
       setSaving(false)
     }
   }
 
   // ── Delete ───────────────────────────────────────────────────────────────
-  async function handleDelete(id, name) {
-    if (!window.confirm(`¿Eliminar a ${name}? Esta acción no se puede deshacer.`)) return
+  async function handleDelete(id) {
     try {
       await api.delete(`/api/users/${id}`)
       setMembers(prev => prev.filter(m => m.id !== id))
+      toast.success("Miembro eliminado")
     } catch (err) {
-      alert(err?.response?.data?.detail || "Error al eliminar.")
+      toast.error(err?.response?.data?.detail || "Error al eliminar")
+    } finally {
+      setConfirmDeleteMember(null)
     }
   }
 
@@ -158,7 +165,10 @@ export default function TeamPage() {
         {/* Member list */}
         <SectionCard style={{ padding: 0, overflow: "hidden" }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: 48, color: colors.textLabel }}>Cargando…</div>
+            <div>
+              <SkeletonRow /><SkeletonRow /><SkeletonRow />
+              <SkeletonRow /><SkeletonRow />
+            </div>
           ) : (
             members.map((m, idx) => {
               const profile = getProfile(m)
@@ -292,7 +302,7 @@ export default function TeamPage() {
                           <Pencil size={14} />
                         </button>
                         {!isSelf && (
-                          <button type="button" onClick={() => handleDelete(m.id, m.name)} style={{
+                          <button type="button" onClick={() => setConfirmDeleteMember({ id: m.id, name: m.name })} style={{
                             padding: "8px 10px", borderRadius: radius.md,
                             border: `1px solid ${colors.border}`, background: colors.bgCard,
                             cursor: "pointer", color: colors.textLabel,
@@ -388,6 +398,16 @@ export default function TeamPage() {
           </button>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmDeleteMember}
+        title={`Eliminar a ${confirmDeleteMember?.name ?? ""}`}
+        message="Esta acción eliminará al miembro permanentemente. Sus tareas y datos históricos permanecerán en el sistema."
+        confirmLabel="Eliminar miembro"
+        variant="danger"
+        onConfirm={() => handleDelete(confirmDeleteMember?.id)}
+        onCancel={() => setConfirmDeleteMember(null)}
+      />
     </Layout>
   )
 }

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { Toaster } from "sonner"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import Login from "./pages/Login"
 import EvalPage from "./pages/EvalPage"
@@ -24,6 +25,17 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              fontFamily: "'Segoe UI', system-ui, sans-serif",
+              fontSize: 14,
+              borderRadius: 12,
+            },
+          }}
+          richColors
+        />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/eval"    element={<PrivateRoute><EvalPage /></PrivateRoute>} />

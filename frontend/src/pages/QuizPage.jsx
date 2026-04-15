@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import { useAuth } from "../context/AuthContext"
 import api from "../services/api"
 import Layout from "../components/Layout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
 import RadialScore from "../components/ui/RadialScore"
+import ConfirmModal from "../components/ui/ConfirmModal"
 import { G, DG, LG, BD, scoreColor } from "../constants/theme"
 
 const YEAR  = new Date().getFullYear()
@@ -44,6 +46,7 @@ export default function QuizPage() {
   const [result, setResult]         = useState(null)   // {correct, total, score, feedback}
   const [loading, setLoading]       = useState(false)
   const [monthResults, setMonthResults] = useState([])
+  const [confirmSubmit, setConfirmSubmit] = useState(false)
 
   const timerRef = useRef(null)
   const startTimeRef = useRef(0)
@@ -83,7 +86,7 @@ export default function QuizPage() {
       setScreen("quiz")
       startTimer()
     } catch (e) {
-      alert(e.response?.data?.detail || "Error al cargar el quiz")
+      toast.error(e.response?.data?.detail || "Error al cargar el quiz")
     } finally {
       setLoading(false)
     }
@@ -106,11 +109,8 @@ export default function QuizPage() {
     if (current > 0) setCurrent(c => c - 1)
   }
 
-  async function handleSubmit() {
-    if (answers.some(a => a === null)) {
-      const unanswered = answers.filter(a => a === null).length
-      if (!window.confirm(`Quedan ${unanswered} preguntas sin responder. ¿Enviar de todos modos?`)) return
-    }
+  async function doSubmit() {
+    setConfirmSubmit(false)
     stopTimer()
     setLoading(true)
 
@@ -133,11 +133,15 @@ export default function QuizPage() {
       api.get(`/api/quiz/results/${YEAR}/${MONTH}`).then(r => setMonthResults(r.data))
     } catch (e) {
       const msg = e.response?.data?.detail || "Error al enviar el quiz"
-      alert(msg)
+      toast.error(msg)
       startTimer()
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleSubmit() {
+    setConfirmSubmit(true)
   }
 
   // Cleanup timer
@@ -221,6 +225,7 @@ export default function QuizPage() {
   if (screen === "quiz") {
     const q = questions[current]
     const answered = answers.filter(a => a !== null).length
+    const unanswered = answers.filter(a => a === null).length
 
     return (
       <Layout>
@@ -288,6 +293,21 @@ export default function QuizPage() {
               </Button>
             )}
           </div>
+
+          <ConfirmModal
+            open={confirmSubmit}
+            title="¿Enviar quiz?"
+            message={
+              unanswered > 0
+                ? `Quedan ${unanswered} pregunta${unanswered > 1 ? "s" : ""} sin responder. ¿Enviar de todos modos?`
+                : "¿Confirmas el envío del quiz? No podrás modificar tus respuestas."
+            }
+            confirmLabel="Enviar"
+            variant={unanswered > 0 ? "warning" : "default"}
+            loading={loading}
+            onConfirm={doSubmit}
+            onCancel={() => { setConfirmSubmit(false); startTimer() }}
+          />
         </div>
       </Layout>
     )

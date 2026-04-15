@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { useAuth } from "../context/AuthContext"
 import api from "../services/api"
 import Layout from "../components/Layout"
 import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
+import ConfirmModal from "../components/ui/ConfirmModal"
+import { SkeletonCard } from "../components/ui/Skeleton"
 import { G, DG, LG, BD, inputStyle } from "../constants/theme"
 import { TEAM } from "../constants/team"
 
@@ -39,6 +42,7 @@ export default function BoardPage() {
   const [form, setForm] = useState({ title:"", desc:"", priority:"media", assignedTo:"" })
   const [editObs, setEditObs]     = useState({})  // itemId → obs string
   const [saving, setSaving]       = useState({})  // itemId → true while saving
+  const [confirmDelete, setConfirmDelete] = useState(null)  // itemId to delete
 
   useEffect(() => {
     api.get("/api/board").then(res => { setItems(res.data); setLoading(false) })
@@ -112,12 +116,15 @@ export default function BoardPage() {
   }
 
   async function deleteItem(itemId) {
-    if (!window.confirm("¿Eliminar este ítem?")) return
     try {
       await api.delete(`/api/board/${itemId}`)
       setItems(prev => prev.filter(it => it.id !== itemId))
+      toast.success("Ítem eliminado")
     } catch (err) {
       console.error("Error deleting board item:", err?.response?.data || err.message)
+      toast.error("No se pudo eliminar el ítem")
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
@@ -185,7 +192,16 @@ export default function BoardPage() {
 
         {/* Kanban board */}
         {loading ? (
-          <div style={{ textAlign:"center", padding: 60, color:"#888" }}>Cargando...</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 16 }}>
+            {[0,1,2].map(col => (
+              <div key={col}>
+                <div style={{ height: 42, borderRadius:"10px 10px 0 0", background:"#e0e0e0", marginBottom: 10 }} className="skeleton-shimmer" />
+                <div style={{ display:"flex", flexDirection:"column", gap: 10 }}>
+                  <SkeletonCard /><SkeletonCard /><SkeletonCard />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 16 }}>
             {columns.map(col => (
@@ -230,7 +246,7 @@ export default function BoardPage() {
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 6 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: DG, flex: 1 }}>{item.title}</div>
                           {isCont && (
-                            <button onClick={() => deleteItem(item.id)} style={{
+                            <button onClick={() => setConfirmDelete(item.id)} style={{
                               background:"none", border:"none", cursor:"pointer", color:"#ddd", fontSize: 14,
                             }}>✕</button>
                           )}
@@ -360,6 +376,16 @@ export default function BoardPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Eliminar ítem"
+        message="¿Estás seguro de que quieres eliminar este ítem? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+        onConfirm={() => deleteItem(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </Layout>
   )
 }
