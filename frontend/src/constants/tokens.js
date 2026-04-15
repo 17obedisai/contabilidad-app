@@ -1,49 +1,53 @@
 // ── Centralized Design Tokens ────────────────────────────────────────────
-// Single source of truth for all visual design values (Bento Box UI style)
+// Theme-aware colors use CSS custom properties (see index.css).
+// Brand / semantic / data-driven colors stay as fixed hex values.
 
 // ── COLORS ───────────────────────────────────────────────────────────────
 export const colors = {
-  // Backgrounds
-  bgPrimary:    "#F3F4F6",     // Page background (gris perla)
-  bgCard:       "#FFFFFF",     // Card background
-  bgSecondary:  "#F8FAFC",     // Secondary surface / subtle sections
+  // Backgrounds — theme-aware
+  bgPrimary:    "var(--bg-primary)",
+  bgCard:       "var(--bg-card)",
+  bgSecondary:  "var(--bg-secondary)",
+  bgHighlight:  "var(--bg-highlight)",
 
-  // Text
-  textTitle:    "#111827",     // Titles, headings
-  textBody:     "#4B5563",     // Descriptions, body text
-  textLabel:    "#94a3b8",     // Labels, captions, muted text
+  // Text — theme-aware
+  textTitle:    "var(--text-title)",
+  textHeading:  "var(--text-heading)",
+  textBody:     "var(--text-body)",
+  textLabel:    "var(--text-label)",
 
-  // Brand
-  brandPine:    "#1a5c2e",     // Primary green (brand)
-  brandPineDk:  "#14472a",     // Dark green (hover, active states)
-  brandPineLt:  "#e8f5e9",     // Light green (backgrounds, highlights)
+  // Brand — fixed (no dark-mode variant needed)
+  brandPine:    "#1a5c2e",
+  brandPineDk:  "#14472a",
+  brandPineLt:  "#e8f5e9",
 
-  // Semantic
-  warning:      "#b8860b",     // Amber warning
-  success:      "#16a34a",     // Green success
-  danger:       "#dc2626",     // Red danger / error
-  info:         "#3498db",     // Blue info
+  // Semantic / data-driven — fixed
+  warning:      "#b8860b",
+  success:      "#16a34a",
+  danger:       "#dc2626",
+  info:         "#3498db",
 
-  // Status
+  // Status chips — fixed
   statusPending:    "#95a5a6",
   statusInProgress: "#3498db",
   statusComplete:   "#27ae60",
 
-  // Priority
+  // Priority chips — fixed
   priorityHigh:   "#e74c3c",
   priorityMedium: "#e67e22",
   priorityLow:    "#27ae60",
 
-  // Borders
-  border:       "#E5E7EB",     // Standard border
-  borderLight:  "#F3F4F6",     // Very subtle border
+  // Borders — theme-aware
+  border:       "var(--border)",
+  borderLight:  "var(--border-light)",
+  borderGreen:  "var(--border-green)",
 }
 
 // ── SHADOWS ──────────────────────────────────────────────────────────────
 export const shadows = {
-  sm:  "0 1px 2px rgba(0,0,0,0.04)",
-  md:  "0 10px 25px -5px rgba(0,0,0,0.05)",
-  lg:  "0 20px 40px -10px rgba(0,0,0,0.1)",
+  sm:  "var(--shadow-sm)",
+  md:  "var(--shadow-md)",
+  lg:  "var(--shadow-lg)",
 }
 
 // ── RADIUS ───────────────────────────────────────────────────────────────
@@ -51,7 +55,7 @@ export const radius = {
   sm:  6,
   md:  12,
   lg:  16,
-  xl:  24,   // Bento cards
+  xl:  24,
 }
 
 // ── TYPOGRAPHY ───────────────────────────────────────────────────────────
@@ -62,7 +66,7 @@ export const typography = {
     fontWeight: 600,
     textTransform: "uppercase",
     letterSpacing: "0.05em",
-    color: colors.textLabel,
+    color: "var(--text-label)",
   },
 }
 
@@ -87,23 +91,23 @@ export function utilColor(pct) {
   return colors.danger
 }
 
-// ── SHARED STYLES ────────────────────────────────────────────────────────
+// ── SHARED INPUT STYLE ───────────────────────────────────────────────────
 export const inputStyle = {
-  background: colors.bgSecondary,
-  border: `1px solid ${colors.border}`,
+  background:   "var(--bg-secondary)",
+  border:       "1px solid var(--border)",
   borderRadius: radius.sm,
-  padding: "10px 14px",
-  color: colors.textTitle,
-  fontSize: 15,
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box",
+  padding:      "10px 14px",
+  color:        "var(--text-title)",
+  fontSize:     15,
+  outline:      "none",
+  width:        "100%",
+  boxSizing:    "border-box",
 }
 
 export const bentoCardStyle = {
-  background: colors.bgCard,
+  background:   "var(--bg-card)",
   borderRadius: radius.xl,
-  padding: "20px",
-  boxShadow: shadows.md,
-  border: "none",
+  padding:      "20px",
+  boxShadow:    "var(--shadow-md)",
+  border:       "none",
 }

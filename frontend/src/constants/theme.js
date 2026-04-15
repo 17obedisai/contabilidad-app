@@ -1,9 +1,12 @@
-export const G   = "#2d6a2e"
-export const DG  = "#1a4a1c"
-export const LG  = "#e8f5e9"
-export const GO  = "#b8941f"
-export const BG  = "#f5f8f4"
-export const BD  = "#c8e6c9"
+// Legacy design tokens — preserved for backward compat with older pages.
+// UI-chrome values now use CSS custom properties for dark mode support.
+
+export const G   = "#2d6a2e"              // brand green — fixed
+export const DG  = "var(--text-heading)"  // dark green text — theme-aware
+export const LG  = "var(--bg-highlight)"  // light green bg — theme-aware
+export const GO  = "#b8941f"              // gold — fixed
+export const BG  = "var(--bg-primary)"    // page background — theme-aware
+export const BD  = "var(--border-green)"  // green border — theme-aware
 
 export function scoreColor(s) {
   return s >= 90 ? G : s >= 75 ? "#7c4dff" : s >= 60 ? "#e67e22" : "#e74c3c"
@@ -14,22 +17,22 @@ export function scoreLabel(s) {
 }
 
 export const inputStyle = {
-  background: "#fafbfa",
-  border: `1px solid ${BD}`,
+  background:   "var(--bg-secondary)",
+  border:       "1px solid var(--border-green)",
   borderRadius: 10,
-  padding: "10px 14px",
-  color: "#1a1a1a",
-  fontSize: 15,
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box",
+  padding:      "10px 14px",
+  color:        "var(--text-title)",
+  fontSize:     15,
+  outline:      "none",
+  width:        "100%",
+  boxSizing:    "border-box",
 }
 
 export const cardStyle = {
-  background: "#fff",
-  border: `1px solid ${BD}`,
+  background:   "var(--bg-card)",
+  border:       "1px solid var(--border-green)",
   borderRadius: 16,
-  padding: "18px 16px",
+  padding:      "18px 16px",
   marginBottom: 14,
-  boxShadow: "0 2px 8px rgba(45,106,46,0.04)",
+  boxShadow:    "var(--shadow-sm)",
 }

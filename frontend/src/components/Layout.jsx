@@ -1,33 +1,46 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { BarChart2, Zap, CheckSquare, Coffee, Trophy, Users, LogOut, Lock, ChevronDown } from "lucide-react"
+import { useTheme } from "../context/ThemeContext"
+import {
+  BarChart2, Zap, CheckSquare, Coffee, Trophy, Users,
+  LogOut, Lock, ChevronDown, Sun, Moon, Menu, X,
+} from "lucide-react"
 import Logo from "./Logo"
 import Avatar from "./ui/Avatar"
 import ChangePasswordModal from "./ui/ChangePasswordModal"
-import { colors, radius, shadows } from "../constants/tokens"
-import { G, DG, BD } from "../constants/theme"
+import { colors, shadows, radius } from "../constants/tokens"
 
 const TABS = [
-  { path: "/eval",    label: "Evaluación",   icon: BarChart2  },
-  { path: "/prod",    label: "Productividad", icon: Zap        },
-  { path: "/board",   label: "Tareas",       icon: CheckSquare },
-  { path: "/quiz",    label: "Quiz",         icon: Coffee     },
-  { path: "/ranking", label: "Ranking",      icon: Trophy     },
+  { path: "/eval",    label: "Evaluación",    icon: BarChart2   },
+  { path: "/prod",    label: "Productividad", icon: Zap         },
+  { path: "/board",   label: "Tareas",        icon: CheckSquare },
+  { path: "/quiz",    label: "Quiz",          icon: Coffee      },
+  { path: "/ranking", label: "Ranking",       icon: Trophy      },
 ]
-
 const ADMIN_TAB = { path: "/team", label: "Equipo", icon: Users }
 
-export default function Layout({ children }) {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
+const PAGE_META = {
+  "/eval":    { title: "Evaluaciones",       subtitle: "Desempeño del equipo" },
+  "/prod":    { title: "Productividad",      subtitle: "Métricas y tareas" },
+  "/board":   { title: "Tablero de Tareas",  subtitle: "Gestión de actividades" },
+  "/quiz":    { title: "Quiz Mensual",       subtitle: "Evaluación de conocimiento" },
+  "/ranking": { title: "Ranking Anual",      subtitle: "Clasificación del equipo" },
+  "/team":    { title: "Gestión de Equipo",  subtitle: "Administración de miembros" },
+}
 
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+export default function Layout({ children }) {
+  const { user, logout }     = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const navigate             = useNavigate()
+  const { pathname }         = useLocation()
+
+  const [sidebarOpen,   setSidebarOpen]   = useState(false)
+  const [dropdownOpen,  setDropdownOpen]  = useState(false)
   const [showChangePwd, setShowChangePwd] = useState(false)
   const dropdownRef = useRef(null)
 
-  // Close dropdown when clicking outside
+  // Close dropdown on outside click
   useEffect(() => {
     function handler(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -38,150 +51,265 @@ export default function Layout({ children }) {
     return () => document.removeEventListener("mousedown", handler)
   }, [])
 
-  function handleLogout() {
-    logout()
-    navigate("/login")
-  }
+  // Close sidebar on route change
+  useEffect(() => { setSidebarOpen(false) }, [pathname])
 
-  const tabs = user?.isCont ? [...TABS, ADMIN_TAB] : TABS
+  function handleLogout() { logout(); navigate("/login") }
+
+  const tabs     = user?.isCont ? [...TABS, ADMIN_TAB] : TABS
+  const pageMeta = PAGE_META[pathname] ?? { title: "Coocentral", subtitle: "" }
+  const isDark   = theme === "dark"
+
+  // ── Shared hover helpers (inline style handlers) ──────────────────
+  const navBtnHover = (e, active) => {
+    if (!active) e.currentTarget.style.background = "var(--bg-primary)"
+  }
+  const navBtnLeave = (e, active) => {
+    if (!active) e.currentTarget.style.background = "transparent"
+  }
+  const menuBtnHover = e => { e.currentTarget.style.background = "var(--bg-primary)" }
+  const menuBtnLeave = e => { e.currentTarget.style.background = "transparent" }
 
   return (
-    <div
-      style={{
-        fontFamily: "'Segoe UI', system-ui, sans-serif",
-        background: colors.bgPrimary,
-        color: colors.textTitle,
-        minHeight: "100vh",
-        padding: "16px 12px",
-        maxWidth: 1100,
-        margin: "0 auto",
-        boxSizing: "border-box",
-      }}
-    >
-      <style>{`* { box-sizing: border-box } select option { background: #fff } textarea { font-family: inherit } input[type=range] { accent-color: ${G} }`}</style>
+    <div className="app-shell">
 
-      {/* Header */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: 16, flexWrap: "wrap", gap: 8,
-      }}>
-        <Logo size={140} />
-        {user && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {/* Avatar dropdown */}
-            <div ref={dropdownRef} style={{ position: "relative" }}>
+      {/* ── Mobile overlay ─────────────────────────────────────────── */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? " open" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      {/* ── Sidebar ────────────────────────────────────────────────── */}
+      <aside className={`sidebar${sidebarOpen ? " open" : ""}`}>
+
+        {/* Logo */}
+        <div style={{
+          padding: "18px 16px 14px",
+          borderBottom: "1px solid var(--border)",
+          flexShrink: 0,
+        }}>
+          <Logo size={128} />
+        </div>
+
+        {/* Nav items */}
+        <nav className="sidebar-nav">
+          {tabs.map(t => {
+            const isActive = pathname === t.path
+            const Icon     = t.icon
+            return (
               <button
+                key={t.path}
                 type="button"
-                onClick={() => setDropdownOpen(v => !v)}
+                onClick={() => navigate(t.path)}
+                onMouseEnter={e => navBtnHover(e, isActive)}
+                onMouseLeave={e => navBtnLeave(e, isActive)}
                 style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: colors.bgCard, border: `1px solid ${colors.border}`,
-                  borderRadius: radius.md, padding: "6px 12px",
-                  cursor: "pointer", boxShadow: shadows.sm,
-                  transition: "box-shadow 0.2s",
+                  display: "flex", alignItems: "center", gap: 11,
+                  width: "100%", padding: "10px 12px",
+                  borderRadius: radius.md, border: "none",
+                  cursor: "pointer", fontSize: 13, fontWeight: 600,
+                  marginBottom: 2, textAlign: "left",
+                  background: isActive ? colors.brandPine : "transparent",
+                  color:      isActive ? "#fff" : "var(--text-body)",
+                  transition: "background 0.15s, color 0.15s",
                 }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = shadows.md}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = shadows.sm}
               >
-                <Avatar emoji={user.emoji} size={32} />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: DG, lineHeight: 1.2 }}>{user.name}</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>{user.isCont ? "Contadora" : user.role}</div>
-                </div>
-                <ChevronDown
-                  size={14}
-                  color={colors.textLabel}
-                  style={{
-                    transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s",
-                  }}
-                />
+                <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+                {t.label}
               </button>
+            )
+          })}
+        </nav>
 
-              {/* Dropdown menu */}
-              {dropdownOpen && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", right: 0,
-                  background: colors.bgCard, borderRadius: radius.md,
-                  boxShadow: shadows.lg, border: `1px solid ${colors.border}`,
-                  minWidth: 180, zIndex: 200, overflow: "hidden",
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => { setDropdownOpen(false); setShowChangePwd(true) }}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      width: "100%", padding: "11px 16px", background: "none",
-                      border: "none", cursor: "pointer", fontSize: 14,
-                      color: colors.textBody, transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = colors.bgPrimary}
-                    onMouseLeave={e => e.currentTarget.style.background = "none"}
-                  >
-                    <Lock size={15} color={colors.textLabel} />
-                    Cambiar contraseña
-                  </button>
-                  <div style={{ height: 1, background: colors.border }} />
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      width: "100%", padding: "11px 16px", background: "none",
-                      border: "none", cursor: "pointer", fontSize: 14,
-                      color: colors.danger, transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = `${colors.danger}08`}
-                    onMouseLeave={e => e.currentTarget.style.background = "none"}
-                  >
-                    <LogOut size={15} color={colors.danger} />
-                    Cerrar sesión
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+        {/* User section (bottom) */}
+        {user && (
+          <div className="sidebar-user" ref={dropdownRef}>
 
-      {/* Nav tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, flexWrap: "wrap" }}>
-        {tabs.map((t) => {
-          const isActive = pathname === t.path
-          const Icon = t.icon
-          return (
+            {/* Avatar trigger */}
             <button
-              key={t.path}
               type="button"
-              onClick={() => navigate(t.path)}
+              onClick={() => setDropdownOpen(v => !v)}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-primary)" }}
+              onMouseLeave={e => { e.currentTarget.style.background = dropdownOpen ? "var(--bg-primary)" : "transparent" }}
               style={{
-                flex: "1 1 auto", minWidth: 0,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                padding: "10px 14px", borderRadius: radius.md,
-                border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-                background: isActive ? colors.brandPine : colors.bgCard,
-                color: isActive ? "#fff" : colors.textBody,
-                boxShadow: isActive ? "none" : shadows.sm,
-                transition: "all 0.2s",
+                display: "flex", alignItems: "center", gap: 10,
+                width: "100%", padding: "10px 12px",
+                borderRadius: radius.md, border: "none",
+                cursor: "pointer", textAlign: "left",
+                background: dropdownOpen ? "var(--bg-primary)" : "transparent",
+                transition: "background 0.15s",
               }}
             >
-              <Icon size={15} strokeWidth={2.5} />
-              {t.label}
+              <Avatar emoji={user.emoji} size={32} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: 700,
+                  color: "var(--text-title)", lineHeight: 1.2,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {user.name}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-label)" }}>
+                  {user.isCont ? "Contadora" : user.role}
+                </div>
+              </div>
+              <ChevronDown
+                size={14}
+                color="var(--text-label)"
+                style={{
+                  transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                  flexShrink: 0,
+                }}
+              />
             </button>
-          )
-        })}
-      </div>
 
-      {children}
+            {/* Dropdown — opens upward */}
+            {dropdownOpen && (
+              <div style={{
+                position: "absolute",
+                bottom: "calc(100% + 8px)",
+                left: 10, right: 10,
+                background: "var(--bg-card)",
+                borderRadius: radius.md,
+                boxShadow: shadows.lg,
+                border: "1px solid var(--border)",
+                zIndex: 200,
+                overflow: "hidden",
+              }}>
+                {/* Dark / Light toggle */}
+                <button
+                  type="button"
+                  onClick={() => { toggleTheme(); setDropdownOpen(false) }}
+                  onMouseEnter={menuBtnHover}
+                  onMouseLeave={menuBtnLeave}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    width: "100%", padding: "11px 16px",
+                    background: "transparent", border: "none", cursor: "pointer",
+                    fontSize: 13, color: "var(--text-body)",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {isDark
+                      ? <Sun  size={15} color="var(--text-label)" />
+                      : <Moon size={15} color="var(--text-label)" />
+                    }
+                    {isDark ? "Modo claro" : "Modo oscuro"}
+                  </div>
+                  {/* Toggle pill */}
+                  <div style={{
+                    width: 32, height: 18, borderRadius: 9, flexShrink: 0,
+                    background: isDark ? colors.brandPine : "var(--border)",
+                    position: "relative", transition: "background 0.2s",
+                  }}>
+                    <div style={{
+                      width: 12, height: 12, borderRadius: "50%",
+                      background: "#fff",
+                      position: "absolute", top: 3,
+                      left: isDark ? 17 : 3,
+                      transition: "left 0.2s",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                    }} />
+                  </div>
+                </button>
 
-      {/* Footer */}
-      <div style={{
-        textAlign: "center", marginTop: 32, padding: 14,
-        borderTop: `1px solid ${colors.border}`,
-      }}>
-        <Logo size={100} />
-        <div style={{ fontSize: 10, color: "#ccc", marginTop: 4 }}>
-          Cooperativa Central de Caficultores del Huila · {new Date().getFullYear()}
+                <div style={{ height: 1, background: "var(--border)" }} />
+
+                <button
+                  type="button"
+                  onClick={() => { setDropdownOpen(false); setShowChangePwd(true) }}
+                  onMouseEnter={menuBtnHover}
+                  onMouseLeave={menuBtnLeave}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    width: "100%", padding: "11px 16px",
+                    background: "transparent", border: "none", cursor: "pointer",
+                    fontSize: 13, color: "var(--text-body)",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <Lock size={15} color="var(--text-label)" />
+                  Cambiar contraseña
+                </button>
+
+                <div style={{ height: 1, background: "var(--border)" }} />
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  onMouseEnter={e => { e.currentTarget.style.background = `${colors.danger}12` }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent" }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    width: "100%", padding: "11px 16px",
+                    background: "transparent", border: "none", cursor: "pointer",
+                    fontSize: 13, color: colors.danger,
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <LogOut size={15} color={colors.danger} />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </aside>
+
+      {/* ── Main area ──────────────────────────────────────────────── */}
+      <div className="main-area">
+
+        {/* Mobile top bar */}
+        <div className="mobile-topbar">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(v => !v)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", padding: 4,
+              color: "var(--text-title)",
+            }}
+          >
+            {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          <Logo size={110} />
+          {/* Spacer to center logo */}
+          <div style={{ width: 30 }} />
+        </div>
+
+        {/* Desktop page header (breadcrumb) */}
+        <div className="page-header">
+          <div>
+            <div style={{
+              fontSize: 17, fontWeight: 800,
+              color: "var(--text-title)", lineHeight: 1.2,
+            }}>
+              {pageMeta.title}
+            </div>
+            {pageMeta.subtitle && (
+              <div style={{ fontSize: 11, color: "var(--text-label)", marginTop: 1 }}>
+                {pageMeta.subtitle}
+              </div>
+            )}
+          </div>
+          {/* Breadcrumb */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 5,
+            fontSize: 12, color: "var(--text-label)",
+          }}>
+            <span>Coocentral</span>
+            <span>/</span>
+            <span style={{ color: "var(--text-body)", fontWeight: 600 }}>
+              {pageMeta.title}
+            </span>
+          </div>
+        </div>
+
+        {/* Page content */}
+        <div className="page-content">
+          {children}
         </div>
       </div>
 
