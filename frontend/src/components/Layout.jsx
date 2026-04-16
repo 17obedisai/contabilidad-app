@@ -88,7 +88,7 @@ export default function Layout({ children }) {
           borderBottom: "1px solid var(--border)",
           flexShrink: 0,
         }}>
-          <Logo size={128} />
+          <Logo size={140} variant={isDark ? "light" : "auto"} />
         </div>
 
         {/* Nav items */}
@@ -274,7 +274,7 @@ export default function Layout({ children }) {
           >
             {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-          <Logo size={110} />
+          <Logo size={120} variant={isDark ? "light" : "auto"} />
           {/* Spacer to center logo */}
           <div style={{ width: 30 }} />
         </div>
