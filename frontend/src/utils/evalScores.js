@@ -1,13 +1,17 @@
+// Weights rebalanced on 2026-04-18 to introduce OKRs as a 30% weighted category.
+// Previous weights (summing to 100) were scaled by 0.7 so OKRs fill the remaining 30%.
+// Totals still sum to 100: 14+6+13+9+5+4+6+6+7+30 = 100.
 export const EVAL_CATS = [
-  { id:"ec",   label:"Eval. Contadora",    icon:"👩‍💼", weight:20, type:"cont"  },
-  { id:"ae",   label:"Autoevaluación",     icon:"🪞",   weight:8,  type:"self"  },
-  { id:"err",  label:"Precisión Contable", icon:"🎯",   weight:18, type:"count", unit:"errores",   pen:4,   start:100 },
-  { id:"punt", label:"Puntualidad",        icon:"⏰",   weight:13, type:"count", unit:"tardanzas",  pen:1.5, start:100 },
-  { id:"perm", label:"Permisos",           icon:"📋",   weight:7,  type:"ct",   unit:"permisos",  free:2,  pen:15,  start:100 },
-  { id:"sal",  label:"Salidas",            icon:"🚪",   weight:6,  type:"ct",   unit:"salidas",   free:4,  pen:5,   start:100 },
-  { id:"uni",  label:"Uniforme",           icon:"👔",   weight:9,  type:"count", unit:"fallas",   pen:20,  start:100 },
-  { id:"part", label:"Participación",      icon:"🎉",   weight:9,  type:"part"  },
-  { id:"quiz", label:"Quiz",               icon:"📝",   weight:10, type:"quiz"  },
+  { id:"ec",   label:"Eval. Contadora",    icon:"👩‍💼", weight:14, type:"cont"  },
+  { id:"ae",   label:"Autoevaluación",     icon:"🪞",   weight:6,  type:"self"  },
+  { id:"err",  label:"Precisión Contable", icon:"🎯",   weight:13, type:"count", unit:"errores",   pen:4,   start:100 },
+  { id:"punt", label:"Puntualidad",        icon:"⏰",   weight:9,  type:"count", unit:"tardanzas",  pen:1.5, start:100 },
+  { id:"perm", label:"Permisos",           icon:"📋",   weight:5,  type:"ct",   unit:"permisos",  free:2,  pen:15,  start:100 },
+  { id:"sal",  label:"Salidas",            icon:"🚪",   weight:4,  type:"ct",   unit:"salidas",   free:4,  pen:5,   start:100 },
+  { id:"uni",  label:"Uniforme",           icon:"👔",   weight:6,  type:"count", unit:"fallas",   pen:20,  start:100 },
+  { id:"part", label:"Participación",      icon:"🎉",   weight:6,  type:"part"  },
+  { id:"quiz", label:"Quiz",               icon:"📝",   weight:7,  type:"quiz"  },
+  { id:"okr",  label:"Objetivos (OKRs)",   icon:"🎯",   weight:30, type:"okr"   },
 ]
 
 export const EV_ITEMS = [
@@ -52,6 +56,17 @@ export function catScore(evalData, catId) {
       if (v != null && v !== "") { s += Number(v) * 10; c++ }
     })
     return c > 0 ? s / c : null
+  }
+
+  if (cat.type === "okr") {
+    // OKR score = average achievement (%) across non-empty objectives.
+    // An objective is "active" when it has text; empty slots are ignored so
+    // unused OKRs don't drag the score down.
+    const okrs = Array.isArray(evalData.okrs) ? evalData.okrs : []
+    const active = okrs.filter(o => o && typeof o.objective === "string" && o.objective.trim() !== "")
+    if (active.length === 0) return null
+    const sum = active.reduce((a, o) => a + Math.min(100, Math.max(0, Number(o.achievement) || 0)), 0)
+    return sum / active.length
   }
 
   return calcMetric(cat, evalData.metrics?.[catId])

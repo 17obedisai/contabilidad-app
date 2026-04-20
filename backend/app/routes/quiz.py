@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from datetime import datetime, timezone
 from app.db.connection import get_database
 from app.db.helpers import doc_to_dict, to_id
@@ -16,6 +16,25 @@ class SubmitRequest(BaseModel):
     month: int
     answers: List[int]   # list of chosen option indices, one per question
     time: float          # seconds taken
+
+
+class QuestionPayload(BaseModel):
+    text: str
+    options: List[str] = Field(..., min_length=2, max_length=6)
+    correct: int        # index into options[]
+    difficulty: Optional[str] = "m"
+
+
+class QuizTemplatePayload(BaseModel):
+    """Full template for a month's quiz — sent by admin editor."""
+    title: str
+    questions: List[QuestionPayload]
+
+
+def _require_admin(token: dict):
+    if not token.get("isCont"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Solo la contadora puede editar el quiz")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -40,6 +59,70 @@ async def get_questions(year: int, month: int, token: dict = Depends(verify_toke
         for i, q in enumerate(quiz.get("questions", []))
     ]
     return {"year": year, "month": month, "questions": questions}
+
+
+@router.get("/template/{year}/{month}")
+async def get_template(year: int, month: int, token: dict = Depends(verify_token)):
+    """
+    Admin-only: returns the FULL quiz template INCLUDING the correct-answer index.
+    Used by the quiz editor panel.
+    Returns an empty template if none exists yet for that month.
+    """
+    _require_admin(token)
+    db = get_database()
+    quiz = await db.quizzes.find_one({"year": year, "month": month})
+    if not quiz:
+        return {"year": year, "month": month, "title": "", "questions": []}
+    return {
+        "year": year,
+        "month": month,
+        "title": quiz.get("title", ""),
+        "questions": [
+            {
+                "text":       q.get("text", ""),
+                "options":    q.get("options", []),
+                "correct":    q.get("correct", 0),
+                "difficulty": q.get("difficulty", "m"),
+            }
+            for q in quiz.get("questions", [])
+        ],
+    }
+
+
+@router.put("/template/{year}/{month}")
+async def save_template(
+    year: int, month: int,
+    body: QuizTemplatePayload,
+    token: dict = Depends(verify_token),
+):
+    """
+    Admin-only: upserts the quiz template for the given month.
+    Validates each question's `correct` index is within its options range.
+    """
+    _require_admin(token)
+    db = get_database()
+
+    # Validate correct-answer indices
+    for i, q in enumerate(body.questions):
+        if q.correct < 0 or q.correct >= len(q.options):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Pregunta {i+1}: índice correcto fuera de rango",
+            )
+
+    doc = {
+        "year":  year,
+        "month": month,
+        "title": body.title.strip(),
+        "questions": [q.model_dump() for q in body.questions],
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.quizzes.update_one(
+        {"year": year, "month": month},
+        {"$set": doc},
+        upsert=True,
+    )
+    return {"ok": True, "year": year, "month": month, "count": len(body.questions)}
 
 
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
@@ -94,6 +177,27 @@ async def submit_quiz(body: SubmitRequest, token: dict = Depends(verify_token)):
         for i, q in enumerate(questions)
     ]
     return {"correct": correct_count, "total": total, "score": score, "feedback": feedback}
+
+
+@router.delete("/results/{userId}/{year}/{month}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_result(
+    userId: str, year: int, month: int,
+    token: dict = Depends(verify_token),
+):
+    """
+    Admin-only: removes the quiz_results document for a specific user/year/month.
+    Allows that employee to retake the quiz for that month.
+    """
+    _require_admin(token)
+    db = get_database()
+    res = await db.quiz_results.delete_one(
+        {"userId": userId, "year": year, "month": month}
+    )
+    if res.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No hay resultado para ese empleado/mes",
+        )
 
 
 @router.get("/results/{year}/{month}")

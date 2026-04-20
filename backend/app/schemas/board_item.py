@@ -20,12 +20,16 @@ class BoardItemCreate(BaseModel):
     title: str
     desc: str
     date: str
+    deadline: Optional[str] = None  # ISO date "YYYY-MM-DD"; legacy items may lack this
     priority: str
     status: str
     progress: int = 0
     observations: str = ""
     obsHistory: List[ObsHistoryEntry] = []
     changes: List[ChangeEntry] = []
+    # Manual ordering within a status column. Lower values render first.
+    # Optional for legacy items; new items get assigned a position on reorder.
+    position: Optional[int] = None
 
 
 class BoardItemOut(BoardItemCreate):

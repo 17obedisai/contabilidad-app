@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { useTheme } from "../context/ThemeContext"
 import {
-  BarChart2, Zap, CheckSquare, Coffee, Trophy, Users,
-  LogOut, Lock, ChevronDown, Sun, Moon, Menu, X,
+  BarChart2, Zap, CheckSquare, Coffee, Trophy, Users, Calendar,
+  LogOut, Lock, ChevronDown, Sun, Moon, Menu, X, LayoutDashboard,
 } from "lucide-react"
 import Logo from "./Logo"
 import Avatar from "./ui/Avatar"
@@ -12,21 +12,29 @@ import ChangePasswordModal from "./ui/ChangePasswordModal"
 import { colors, shadows, radius } from "../constants/tokens"
 
 const TABS = [
-  { path: "/eval",    label: "Evaluación",    icon: BarChart2   },
-  { path: "/prod",    label: "Productividad", icon: Zap         },
-  { path: "/board",   label: "Tareas",        icon: CheckSquare },
-  { path: "/quiz",    label: "Quiz",          icon: Coffee      },
-  { path: "/ranking", label: "Ranking",       icon: Trophy      },
+  { path: "/eval",     label: "Evaluación",    icon: BarChart2   },
+  { path: "/prod",     label: "Productividad", icon: Zap         },
+  { path: "/board",    label: "Tareas",        icon: CheckSquare },
+  { path: "/calendar", label: "Calendario",    icon: Calendar    },
+  { path: "/quiz",     label: "Quiz",          icon: Coffee      },
+  { path: "/ranking",  label: "Ranking",       icon: Trophy      },
 ]
-const ADMIN_TAB = { path: "/team", label: "Equipo", icon: Users }
+// Admin-only tabs. Dashboard is placed first so GG/Admin lands on the
+// Vista Ejecutiva naturally when navigating the admin section.
+const ADMIN_TABS = [
+  { path: "/dashboard", label: "Vista Ejecutiva", icon: LayoutDashboard },
+  { path: "/team",      label: "Equipo",          icon: Users },
+]
 
 const PAGE_META = {
-  "/eval":    { title: "Evaluaciones",       subtitle: "Desempeño del equipo" },
-  "/prod":    { title: "Productividad",      subtitle: "Métricas y tareas" },
-  "/board":   { title: "Tablero de Tareas",  subtitle: "Gestión de actividades" },
-  "/quiz":    { title: "Quiz Mensual",       subtitle: "Evaluación de conocimiento" },
-  "/ranking": { title: "Ranking Anual",      subtitle: "Clasificación del equipo" },
-  "/team":    { title: "Gestión de Equipo",  subtitle: "Administración de miembros" },
+  "/eval":      { title: "Evaluaciones",       subtitle: "Desempeño del equipo" },
+  "/prod":      { title: "Productividad",      subtitle: "Métricas y tareas" },
+  "/board":     { title: "Tablero de Tareas",  subtitle: "Gestión de actividades" },
+  "/calendar":  { title: "Calendario",         subtitle: "Vencimientos y eventos" },
+  "/quiz":      { title: "Quiz Mensual",       subtitle: "Evaluación de conocimiento" },
+  "/ranking":   { title: "Ranking Anual",      subtitle: "Clasificación del equipo" },
+  "/team":      { title: "Gestión de Equipo",  subtitle: "Administración de miembros" },
+  "/dashboard": { title: "Vista Ejecutiva",    subtitle: "Matriz de talento" },
 }
 
 export default function Layout({ children }) {
@@ -56,7 +64,7 @@ export default function Layout({ children }) {
 
   function handleLogout() { logout(); navigate("/login") }
 
-  const tabs     = user?.isCont ? [...TABS, ADMIN_TAB] : TABS
+  const tabs     = user?.isCont ? [...TABS, ...ADMIN_TABS] : TABS
   const pageMeta = PAGE_META[pathname] ?? { title: "Coocentral", subtitle: "" }
   const isDark   = theme === "dark"
 

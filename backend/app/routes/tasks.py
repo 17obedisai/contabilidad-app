@@ -37,7 +37,7 @@ async def update_task(taskId: str, body: dict, token: dict = Depends(verify_toke
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     _require_ownership(token, doc["userId"])
 
-    allowed = {"hoursActual", "hoursEstimated", "type", "freq", "title"}
+    allowed = {"hoursActual", "hoursEstimated", "type", "freq", "title", "completionStatus"}
     update_fields = {k: v for k, v in body.items() if k in allowed}
     if not update_fields:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nada que actualizar")

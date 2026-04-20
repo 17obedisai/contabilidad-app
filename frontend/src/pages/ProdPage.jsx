@@ -14,17 +14,39 @@ import { TEAM } from "../constants/team"
 import { colors, radius, shadows, typography, inputStyle, utilColor } from "../constants/tokens"
 import {
   Target, TrendingUp, Clock, ListChecks, Plus, X,
-  Users, ChevronDown, User, Briefcase, CalendarClock, Hash
+  Users, User, Briefcase, CalendarClock, Hash,
+  CheckCircle2, AlertTriangle, CircleDashed
 } from "lucide-react"
 
 const HM = 190
 const FREQ_MULT = { diaria: 22, semanal: 4.33, mensual: 1 }
 
+// Compliance-based weighting. hoursEstimated is the "weight" of each task;
+// the status defines how much of that weight was delivered.
+const STATUS_VALUE = { ON_TIME: 1.0, LATE: 0.5, PENDING: 0.0 }
+const STATUS_LABELS = { ON_TIME: "A Tiempo", LATE: "Tarde", PENDING: "Pendiente" }
+const STATUS_ICONS = { ON_TIME: CheckCircle2, LATE: AlertTriangle, PENDING: CircleDashed }
+const STATUS_ORDER = ["ON_TIME", "LATE", "PENDING"]
+
 function taskHours(t) {
   return (t.hoursEstimated ?? 0) * (FREQ_MULT[t.freq] ?? 1)
 }
-function taskActual(t) {
-  return (t.hoursActual ?? t.hoursEstimated ?? 0) * (FREQ_MULT[t.freq] ?? 1)
+function taskCompletion(t) {
+  const status = t.completionStatus ?? "PENDING"
+  return taskHours(t) * (STATUS_VALUE[status] ?? 0)
+}
+
+// Compliance index: < 70 red, 70-89 yellow, 90-100 green.
+function cumplColor(pct) {
+  if (pct < 70) return "#e74c3c"
+  if (pct < 90) return "#f1c40f"
+  return "#27ae60"
+}
+// Status pill accent (for the active option).
+function statusColor(s) {
+  if (s === "ON_TIME") return "#27ae60"
+  if (s === "LATE")    return "#f1c40f"
+  return "#9ca3af"
 }
 
 const FREQ_LABELS = { diaria: "Diaria", semanal: "Semanal", mensual: "Mensual" }
@@ -47,7 +69,9 @@ export default function ProdPage() {
   useEffect(() => {
     if (!isCont) return
     api.get("/api/users").then(res => {
-      const sorted = res.data.sort((a, b) => {
+      // Exclude Contadora (admin) — she isn't evaluated or measured for productivity.
+      const nonCont = res.data.filter(u => !u.isCont)
+      const sorted = nonCont.sort((a, b) => {
         const ai = TEAM.findIndex(t => t.nick === a.nick)
         const bi = TEAM.findIndex(t => t.nick === b.nick)
         return ai - bi
@@ -75,10 +99,11 @@ export default function ProdPage() {
       })
   }, [isCont, teamUsers])
 
-  const totalEst    = tasks.reduce((s, t) => s + taskHours(t), 0)
-  const totalActual = tasks.reduce((s, t) => s + taskActual(t), 0)
-  const utilPct     = Math.min((totalActual / HM) * 100, 150)
-  const estPct      = Math.min((totalEst / HM) * 100, 150)
+  const totalEst        = tasks.reduce((s, t) => s + taskHours(t), 0)
+  const totalCompletion = tasks.reduce((s, t) => s + taskCompletion(t), 0)
+  // Índice de Cumplimiento: delivered weight over total weight.
+  const cumplPct  = totalEst > 0 ? (totalCompletion / totalEst) * 100 : 0
+  const estPct    = Math.min((totalEst / HM) * 100, 150)
 
   async function updateHours(taskId, field, value) {
     const num = Math.max(0, Number(value) || 0)
@@ -86,10 +111,17 @@ export default function ProdPage() {
     try { await api.put(`/api/tasks/${taskId}`, { [field]: num }) } catch { /* ignore */ }
   }
 
+  async function updateStatus(taskId, status) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completionStatus: status } : t))
+    try { await api.put(`/api/tasks/${taskId}`, { completionStatus: status }) } catch { /* ignore */ }
+  }
+
   async function addTask() {
     if (!form.title.trim() || !selectedId) return
     try {
-      const res = await api.post("/api/tasks", { ...form, userId: selectedId, hoursActual: 0 })
+      const res = await api.post("/api/tasks", {
+        ...form, userId: selectedId, hoursActual: 0, completionStatus: "PENDING",
+      })
       setTasks(prev => [...prev, res.data])
       setForm({ title:"", freq:"mensual", type:"contable", hoursEstimated:1 })
       setShowForm(false)
@@ -108,10 +140,6 @@ export default function ProdPage() {
     }
   }
 
-  const selectedProfile = teamUsers.length
-    ? TEAM.find(t => t.nick === teamUsers.find(u => u.id === selectedId)?.nick)
-    : TEAM.find(t => t.nick === user?.nick)
-
   return (
     <Layout>
       <div style={{
@@ -122,22 +150,28 @@ export default function ProdPage() {
         {/* Employee selector (contadora only) */}
         {isCont && (
           <SectionCard icon={Users} title="Empleado" style={{ padding: "16px 20px" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+              gap: 8,
+            }}>
               {teamUsers.map(u => {
-                const p = TEAM.find(t => t.nick === u.nick)
                 const isActive = selectedId === u.id
                 return (
                   <button key={u.id} onClick={() => setSelectedId(u.id)} style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
-                    borderRadius: 20, cursor: "pointer", fontSize: 13,
+                    display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+                    width: "100%", justifyContent: "flex-start",
+                    borderRadius: 12, cursor: "pointer", fontSize: 13,
                     border: `2px solid ${isActive ? colors.brandPine : colors.border}`,
                     background: isActive ? colors.brandPineLt : colors.bgCard,
-                    color: isActive ? colors.brandPine : colors.textBody,
+                    // Active pill bg is light pastel — force dark text for AA contrast in any theme.
+                    color: isActive ? "#111827" : colors.textBody,
                     fontWeight: isActive ? 700 : 500,
                     transition: "all 0.2s ease",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
-                    <User size={14} />
-                    <span>{u.nick}</span>
+                    <User size={14} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.nick}</span>
                   </button>
                 )
               })}
@@ -161,10 +195,10 @@ export default function ProdPage() {
             },
             {
               icon: TrendingUp,
-              label: "Horas Reales",
-              value: `${totalActual.toFixed(1)}h`,
-              sub: `${utilPct.toFixed(0)}% utilización`,
-              color: utilColor(utilPct),
+              label: "Cumplimiento",
+              value: `${cumplPct.toFixed(0)}%`,
+              sub: `${totalCompletion.toFixed(1)}h entregadas`,
+              color: cumplColor(cumplPct),
             },
             {
               icon: ListChecks,
@@ -195,21 +229,21 @@ export default function ProdPage() {
           ))}
         </div>
 
-        {/* Utilization gauge + bar */}
-        <SectionCard icon={Target} title="Utilización del mes">
+        {/* Compliance gauge + bar */}
+        <SectionCard icon={Target} title="Índice de Cumplimiento">
           <div style={{
             display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
           }}>
-            <Gauge value={utilPct} size={110} label="Utilización" color={utilColor(utilPct)} />
+            <Gauge value={cumplPct} size={110} label="Cumplimiento" color={cumplColor(cumplPct)} />
             <div style={{ flex: 1, minWidth: 200 }}>
-              <ThickBar value={Math.min(utilPct, 100)} color={utilColor(utilPct)} height={14} />
+              <ThickBar value={Math.min(cumplPct, 100)} color={cumplColor(cumplPct)} height={14} />
               <div style={{
                 display: "flex", justifyContent: "space-between", marginTop: 8,
                 fontSize: 12, color: colors.textLabel,
               }}>
-                <span>Base {HM} h/mes</span>
-                <span>Real {totalActual.toFixed(1)} h</span>
+                <span>Entregado {totalCompletion.toFixed(1)} h</span>
                 <span>Estimado {totalEst.toFixed(1)} h</span>
+                <span>{cumplPct.toFixed(0)}%</span>
               </div>
             </div>
           </div>
@@ -303,8 +337,9 @@ export default function ProdPage() {
             tasks.map((t, idx) => {
               const mult = FREQ_MULT[t.freq] ?? 1
               const estH = (t.hoursEstimated ?? 0) * mult
-              const actH = (t.hoursActual ?? t.hoursEstimated ?? 0) * mult
-              const pct  = estH > 0 ? Math.min((actH / estH) * 100, 150) : 100
+              const status = t.completionStatus ?? "PENDING"
+              const delivered = estH * (STATUS_VALUE[status] ?? 0)
+              const pct = estH > 0 ? (delivered / estH) * 100 : 0
               const TypeIcon = TYPE_ICONS[t.type] || Hash
               return (
                 <div key={t.id} style={{
@@ -331,23 +366,25 @@ export default function ProdPage() {
                     }}>
                       {t.title || t.type}
                     </div>
-                    <div style={{ fontSize: 12, color: colors.textLabel, marginTop: 2, display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ fontSize: 12, color: colors.textLabel, marginTop: 2, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                       <CalendarClock size={11} />
                       <span>{FREQ_LABELS[t.freq] ?? t.freq}</span>
                       <span style={{ color: colors.border }}>|</span>
                       <span>{TYPE_LABELS[t.type] ?? t.type}</span>
                       <span style={{ color: colors.border }}>|</span>
-                      <span>{estH.toFixed(1)} h/mes est</span>
+                      <span>{estH.toFixed(1)} h/mes peso</span>
                       <span style={{ color: colors.border }}>|</span>
-                      <span style={{ fontWeight: 600, color: utilColor(pct) }}>{actH.toFixed(1)} h/mes real</span>
+                      <span style={{ fontWeight: 600, color: cumplColor(pct) }}>
+                        {STATUS_LABELS[status]} · {pct.toFixed(0)}%
+                      </span>
                     </div>
                     <div style={{ marginTop: 6 }}>
-                      <ThickBar value={Math.min(pct, 100)} color={utilColor(pct)} height={5} showLabel={false} />
+                      <ThickBar value={Math.min(pct, 100)} color={cumplColor(pct)} height={5} showLabel={false} />
                     </div>
                   </div>
 
-                  {/* Hour inputs */}
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                  {/* Status pill selector + (optional) estimated hours editor */}
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
                     {isCont && (
                       <div style={{ textAlign: "center" }}>
                         <div style={{ ...typography.labelStyle, marginBottom: 3, fontSize: 10 }}>Est</div>
@@ -356,11 +393,46 @@ export default function ProdPage() {
                           style={{ ...inputStyle, width: 58, textAlign: "center", padding: "6px 4px", fontSize: 13 }} />
                       </div>
                     )}
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ ...typography.labelStyle, marginBottom: 3, fontSize: 10 }}>Real</div>
-                      <input type="number" min="0" step="0.5" value={t.hoursActual ?? 0}
-                        onChange={e => updateHours(t.id, "hoursActual", e.target.value)}
-                        style={{ ...inputStyle, width: 58, textAlign: "center", padding: "6px 4px", fontSize: 13 }} />
+                    <div
+                      role="group"
+                      aria-label="Estado de cumplimiento"
+                      style={{
+                        display: "inline-flex",
+                        background: colors.bgSecondary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: 999,
+                        padding: 3,
+                        gap: 2,
+                      }}
+                    >
+                      {STATUS_ORDER.map(s => {
+                        const Icon = STATUS_ICONS[s]
+                        const active = status === s
+                        const accent = statusColor(s)
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => updateStatus(t.id, s)}
+                            title={STATUS_LABELS[s]}
+                            className={`status-pill${active ? " active" : ""}`}
+                            // Remount the element when active flips so the CSS
+                            // keyframe re-fires (otherwise it runs only once).
+                            data-pop-key={`${t.id}-${status}`}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 6,
+                              padding: "6px 12px", borderRadius: 999,
+                              border: "none", cursor: "pointer",
+                              fontSize: 12, fontWeight: 700,
+                              background: active ? accent : "transparent",
+                              color: active ? "#fff" : colors.textLabel,
+                            }}
+                          >
+                            <Icon size={13} strokeWidth={2.5} />
+                            <span>{STATUS_LABELS[s]}</span>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -387,15 +459,15 @@ export default function ProdPage() {
           )}
         </SectionCard>
 
-        {/* Team utilization (contadora view) */}
+        {/* Team compliance (contadora view) */}
         {isCont && Object.keys(teamTasks).length > 0 && (
-          <SectionCard icon={Users} title="Utilización del Equipo">
+          <SectionCard icon={Users} title="Cumplimiento del Equipo">
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {teamUsers.map(u => {
                 const uTasks = teamTasks[u.id] ?? []
-                const act    = uTasks.reduce((s, t) => s + taskActual(t), 0)
-                const pct    = Math.min((act / HM) * 100, 150)
-                const p      = TEAM.find(t => t.nick === u.nick)
+                const est    = uTasks.reduce((s, t) => s + taskHours(t), 0)
+                const deliv  = uTasks.reduce((s, t) => s + taskCompletion(t), 0)
+                const pct    = est > 0 ? (deliv / est) * 100 : 0
                 const isSelected = u.id === selectedId
                 return (
                   <button
@@ -417,24 +489,26 @@ export default function ProdPage() {
                       <User size={16} color={colors.brandPine} />
                     </div>
                     <div style={{
-                      width: 80, fontSize: 13, color: colors.textTitle,
+                      width: 80, fontSize: 13,
+                      // Force dark text on light pastel selected bg for contrast in any theme.
+                      color: isSelected ? "#111827" : colors.textTitle,
                       fontWeight: 600, textAlign: "left",
                     }}>
                       {u.nick}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <ThickBar value={Math.min(pct, 100)} color={utilColor(pct)} height={8} showLabel={false} />
+                      <ThickBar value={Math.min(pct, 100)} color={cumplColor(pct)} height={8} showLabel={false} />
                     </div>
                     <div style={{
                       width: 50, textAlign: "right", fontSize: 13,
-                      fontWeight: 700, color: utilColor(pct),
+                      fontWeight: 700, color: cumplColor(pct),
                     }}>
                       {pct.toFixed(0)}%
                     </div>
                     <div style={{
-                      width: 70, textAlign: "right", fontSize: 11, color: colors.textLabel,
+                      width: 80, textAlign: "right", fontSize: 11, color: colors.textLabel,
                     }}>
-                      {act.toFixed(0)}/{HM} h
+                      {deliv.toFixed(0)}/{est.toFixed(0)} h
                     </div>
                   </button>
                 )

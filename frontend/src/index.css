@@ -161,13 +161,19 @@ input[type="range"] {
   z-index: 99;
   backdrop-filter: blur(2px);
   opacity: 0;
+  pointer-events: none;       /* invisible AND non-blocking when closed */
   transition: opacity 0.3s;
 }
 .sidebar-overlay.open {
   opacity: 1;
+  pointer-events: auto;       /* activate clicks only when sidebar is open */
 }
 
 /* Mobile: compact top bar (hamburger) */
+.kanban-mobile-filter {
+  display: none;
+}
+
 .mobile-topbar {
   display: none;
   height: 56px;
@@ -208,6 +214,94 @@ input[type="range"] {
   .page-content {
     padding: 16px;
   }
+
+  /* Team management rows — stack vertically so action buttons stay reachable */
+  .team-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .team-row > .team-actions {
+    width: 100%;
+    justify-content: flex-start !important;
+    flex-wrap: wrap;
+  }
+  .team-row > .team-actions > button {
+    flex: 0 0 auto;
+  }
+
+  /* Kanban board — single column stack on mobile, full-width cards */
+  .kanban-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .kanban-column {
+    width: 100%;
+  }
+  /* Mobile column filter pills are hidden on desktop, shown on mobile */
+  .kanban-mobile-filter {
+    display: flex !important;
+  }
+  /* Hide non-active columns on mobile when a filter pill is selected */
+  .kanban-column[data-mobile-hidden="true"] {
+    display: none !important;
+  }
+  /* Hide column headers on mobile because they duplicate the active pill */
+  .kanban-column-header {
+    display: none !important;
+  }
+
+  /* Calendar — stack side panel below main calendar; shrink day cells */
+  .calendar-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .calendar-cell {
+    min-height: 64px !important;
+    padding: 4px !important;
+  }
+}
+
+/* Tablet: side panel collapses earlier than 768 to keep day cells legible */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .calendar-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Login profile grid — responsive ─────────────────────────────────── */
+/* Mobile (default): vertical list with max-height + scroll (matches original). */
+.login-card       { max-width: 420px; }
+.login-profiles   {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.login-profile-avatar { flex-shrink: 0; }
+
+/* Desktop: widen card, grid of 2 columns, no scroll, bigger text/avatar. */
+@media (min-width: 768px) {
+  .login-card { max-width: 720px; }
+  .login-profiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+    gap: 10px;
+  }
+  .login-profile-button { padding: 14px 16px !important; gap: 14px !important; }
+  .login-profile-name   { font-size: 15px !important; }
+  .login-profile-role   { font-size: 12px !important; }
+  .login-profile-avatar { transform: scale(1.15); transform-origin: center; }
+}
+
+/* Large desktop: 3 columns for teams of ~9 people (fits nicely in 3×3). */
+@media (min-width: 1024px) {
+  .login-card { max-width: 880px; }
+  .login-profiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
 }
 
 /* ── Skeleton shimmer (theme-aware via CSS vars) ─────────────────────── */
@@ -225,4 +319,95 @@ input[type="range"] {
   );
   background-size: 800px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* ── Status pill (ProdPage) — pop animation on click ─────────────────── */
+@keyframes pillPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.status-pill {
+  transition: background 0.3s ease, color 0.3s ease,
+              transform 0.3s cubic-bezier(.34,1.56,.64,1),
+              opacity 0.3s ease, box-shadow 0.3s ease;
+  opacity: 0.55;
+  transform: scale(1);
+}
+.status-pill:hover { opacity: 0.85; }
+.status-pill.active {
+  opacity: 1;
+  animation: pillPop 0.35s cubic-bezier(.34,1.56,.64,1);
+  box-shadow: 0 4px 10px -2px rgba(0,0,0,0.18);
+}
+
+/* ── OKR range slider (EvalPage) ─────────────────────────────────────── */
+/* Accent is driven by --okr-accent inline style per slider instance.     */
+.okr-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--okr-accent, #16a34a) 0%,
+    var(--okr-accent, #16a34a) var(--okr-pct, 0%),
+    var(--border) var(--okr-pct, 0%),
+    var(--border) 100%
+  );
+  transition: filter 0.25s ease, box-shadow 0.25s ease;
+}
+.okr-slider:disabled { cursor: default; opacity: 0.75; }
+.okr-slider:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--okr-accent, #16a34a) 14%, transparent);
+}
+.okr-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--okr-accent, #16a34a);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.okr-slider::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--okr-accent, #16a34a);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.okr-slider:hover:not(:disabled)::-webkit-slider-thumb { transform: scale(1.15); }
+.okr-slider:hover:not(:disabled)::-moz-range-thumb     { transform: scale(1.15); }
+.okr-slider:active:not(:disabled)::-webkit-slider-thumb { transform: scale(1.25); }
+.okr-slider:active:not(:disabled)::-moz-range-thumb     { transform: scale(1.25); }
+
+/* ── Talent Matrix dot (ExecutiveDashboard) ──────────────────────────── */
+/* On hover, the avatar lifts, grows, and takes top z-index so overlapping
+   points become individually readable. The name chip also scales up.    */
+.matrix-dot {
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), z-index 0s;
+  z-index: 1;
+  cursor: pointer;
+}
+.matrix-dot:hover {
+  transform: scale(1.25);
+  z-index: 50;
+}
+.matrix-dot:hover .matrix-dot-chip {
+  background: var(--bg-highlight);
+  color: var(--text-title);
+  border-color: currentColor;
+  transform: scale(1.08);
+}
+.matrix-dot-chip {
+  transition: background 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }

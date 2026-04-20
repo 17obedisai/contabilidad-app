@@ -21,7 +21,7 @@ async def get_evaluation(
     doc = await db.evaluations.find_one({"userId": userId, "year": year, "month": month})
     if not doc:
         return {"userId": userId, "year": year, "month": month,
-                "self_eval": {}, "cont_eval": {}, "metrics": {}}
+                "self_eval": {}, "cont_eval": {}, "metrics": {}, "okrs": []}
     return doc_to_dict(doc)
 
 
@@ -46,7 +46,7 @@ async def save_evaluation(
                                 detail="Solo puedes enviar tu propia autoevaluación")
         update_fields["self_eval"] = body["self_eval"]
 
-    if "cont_eval" in body or "metrics" in body:
+    if "cont_eval" in body or "metrics" in body or "okrs" in body:
         if not token["isCont"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="Solo la contadora puede registrar evaluación de contadora")
@@ -54,6 +54,22 @@ async def save_evaluation(
             update_fields["cont_eval"] = body["cont_eval"]
         if "metrics" in body:
             update_fields["metrics"] = body["metrics"]
+        if "okrs" in body:
+            # Clamp to max 3 objectives; normalize achievement to 0-100.
+            raw = body["okrs"] if isinstance(body["okrs"], list) else []
+            clean: list = []
+            for item in raw[:3]:
+                if not isinstance(item, dict):
+                    continue
+                obj = str(item.get("objective", ""))[:200]
+                ach = item.get("achievement", 0)
+                try:
+                    ach = float(ach)
+                except (TypeError, ValueError):
+                    ach = 0.0
+                ach = max(0.0, min(100.0, ach))
+                clean.append({"objective": obj, "achievement": ach})
+            update_fields["okrs"] = clean
 
     if not update_fields:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,

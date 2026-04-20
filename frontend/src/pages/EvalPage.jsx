@@ -8,11 +8,14 @@ import ProgressBar from "../components/ui/ProgressBar"
 import RatingButtons from "../components/ui/RatingButtons"
 import Counter from "../components/ui/Counter"
 import Card from "../components/ui/Card"
+import SectionCard from "../components/ui/SectionCard"
 import Button from "../components/ui/Button"
 import { SkeletonRow } from "../components/ui/Skeleton"
 import Skeleton from "../components/ui/Skeleton"
 import { G, DG, LG, scoreColor, scoreLabel, inputStyle } from "../constants/theme"
+import { colors } from "../constants/tokens"
 import { EVAL_CATS, EV_ITEMS, calcMetric, catScore, computeMonthScore, computeYearScore } from "../utils/evalScores"
+import { Users, User, Target, Plus, Trash2 } from "lucide-react"
 
 // ── constants ─────────────────────────────────────────────────────────────────
 const YEAR = new Date().getFullYear()
@@ -20,7 +23,8 @@ const MS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","D
 const MF = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto",
             "Septiembre","Octubre","Noviembre","Diciembre"]
 
-const emptyEval = () => ({ self_eval: {}, cont_eval: {}, metrics: {} })
+const emptyEval = () => ({ self_eval: {}, cont_eval: {}, metrics: {}, okrs: [] })
+const MAX_OKRS = 3
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function EvalPage() {
@@ -34,7 +38,7 @@ export default function EvalPage() {
   const [loading, setLoading]           = useState(false)
   const [saving, setSaving]             = useState(false)
 
-  const saveTimers = useRef({ self: null, cont: null, metrics: null })
+  const saveTimers = useRef({ self: null, cont: null, metrics: null, okrs: null })
 
   // load team (contadora only)
   useEffect(() => {
@@ -121,6 +125,29 @@ export default function EvalPage() {
     scheduleSave("metrics", { metrics: updated })
   }
 
+  // ── OKRs ──────────────────────────────────────────────────────────────
+  // We keep OKRs as a simple array so it matches the Mongo document exactly.
+  // patchMonth + scheduleSave drive the optimistic update + debounced PUT.
+  function handleOkrsChange(nextOkrs) {
+    const clamped = nextOkrs.slice(0, MAX_OKRS)
+    patchMonth({ okrs: clamped })
+    scheduleSave("okrs", { okrs: clamped })
+  }
+  function addOkr() {
+    const okrs = Array.isArray(currentEval.okrs) ? currentEval.okrs : []
+    if (okrs.length >= MAX_OKRS) return
+    handleOkrsChange([...okrs, { objective: "", achievement: 0 }])
+  }
+  function updateOkr(idx, patch) {
+    const okrs = Array.isArray(currentEval.okrs) ? currentEval.okrs : []
+    const next = okrs.map((o, i) => i === idx ? { ...o, ...patch } : o)
+    handleOkrsChange(next)
+  }
+  function removeOkr(idx) {
+    const okrs = Array.isArray(currentEval.okrs) ? currentEval.okrs : []
+    handleOkrsChange(okrs.filter((_, i) => i !== idx))
+  }
+
   // ── section header helper ─────────────────────────────────────────────────
   const SectionHeader = ({ icon, text }) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -132,23 +159,36 @@ export default function EvalPage() {
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <Layout>
-      {/* Employee selector — contadora only */}
+      {/* Employee selector — contadora only (matches ProdPage style) */}
       {isCont && teamUsers.length > 0 && (
-        <Card style={{ padding: 12, marginBottom: 14 }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {teamUsers.map(u => (
-              <Button
-                key={u.id}
-                active={selectedId === u.id}
-                onClick={() => setSelectedId(u.id)}
-                style={{ padding: "8px 14px", display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <Avatar emoji={u.emoji} size={28} />
-                <span style={{ fontSize: 13 }}>{u.name}</span>
-              </Button>
-            ))}
+        <SectionCard icon={Users} title="Empleado" style={{ padding: "16px 20px", marginBottom: 14 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+            gap: 8,
+          }}>
+            {teamUsers.map(u => {
+              const isActive = selectedId === u.id
+              return (
+                <button key={u.id} onClick={() => setSelectedId(u.id)} style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+                  width: "100%", justifyContent: "flex-start",
+                  borderRadius: 12, cursor: "pointer", fontSize: 13,
+                  border: `2px solid ${isActive ? colors.brandPine : colors.border}`,
+                  background: isActive ? colors.brandPineLt : colors.bgCard,
+                  // Force dark text on light pastel active bg.
+                  color: isActive ? "#111827" : colors.textBody,
+                  fontWeight: isActive ? 700 : 500,
+                  transition: "all 0.2s ease",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  <User size={14} style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.nick}</span>
+                </button>
+              )
+            })}
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* Month selector */}
@@ -173,32 +213,32 @@ export default function EvalPage() {
           <SkeletonRow withAvatar={false} />
         </Card>
       ) : !selectedId ? (
-        <Card style={{ textAlign: "center", padding: 40, color: "#aaa" }}>
+        <Card style={{ textAlign: "center", padding: 40, color: "var(--text-label)" }}>
           Selecciona un empleado
         </Card>
       ) : (
         <>
-          {/* ── Score cards ─────────────────────────────────────── */}
+          {/* ── Score cards (Bento) ─────────────────────────────── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <Card style={{ textAlign: "center", padding: 24, marginBottom: 0 }}>
-              <div style={{ fontSize: 12, color: "#888", fontWeight: 600, marginBottom: 6 }}>{MS[month]}</div>
+            <SectionCard style={{ textAlign: "center", padding: 24 }}>
+              <div style={{ fontSize: 12, color: "var(--text-label)", fontWeight: 600, marginBottom: 6 }}>{MS[month]}</div>
               <RadialScore score={moScore} size={110} />
               <div style={{ fontSize: 13, color: scoreColor(moScore), fontWeight: 700, marginTop: 6 }}>
                 {scoreLabel(moScore)}
               </div>
-            </Card>
-            <Card style={{ textAlign: "center", padding: 24, marginBottom: 0 }}>
-              <div style={{ fontSize: 12, color: "#888", fontWeight: 600, marginBottom: 6 }}>AÑO {YEAR}</div>
+            </SectionCard>
+            <SectionCard style={{ textAlign: "center", padding: 24 }}>
+              <div style={{ fontSize: 12, color: "var(--text-label)", fontWeight: 600, marginBottom: 6 }}>AÑO {YEAR}</div>
               <RadialScore score={yrScore} size={110} />
               <div style={{ fontSize: 13, color: scoreColor(yrScore), fontWeight: 700, marginTop: 6 }}>
                 {scoreLabel(yrScore)}
               </div>
-            </Card>
+            </SectionCard>
           </div>
 
           {/* ── Trend chart ─────────────────────────────────────── */}
-          <Card>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#666", marginBottom: 10 }}>
+          <SectionCard style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-body)", marginBottom: 10 }}>
               📈 Tendencia {selectedUser?.name || ""}
             </div>
             <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 70 }}>
@@ -206,19 +246,19 @@ export default function EvalPage() {
                 const v = monthScores[i]
                 return (
                   <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                    {v > 0 && <span style={{ fontSize: 10, color: "#999" }}>{Math.round(v)}</span>}
+                    {v > 0 && <span style={{ fontSize: 10, color: "var(--text-label)" }}>{Math.round(v)}</span>}
                     <div style={{
                       width: "100%", maxWidth: 34, borderRadius: 5,
                       height: Math.max(5, (v / 100) * 55),
-                      background: i === month ? G : "#c8e6c9",
+                      background: i === month ? G : "var(--border-green)",
                       transition: "height 0.4s",
                     }} />
-                    <span style={{ fontSize: 10, color: "#999" }}>{label}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-label)" }}>{label}</span>
                   </div>
                 )
               })}
             </div>
-          </Card>
+          </SectionCard>
 
           {/* ── Self-eval: editable (own profile or regular user) ── */}
           {showEditSelf && (
@@ -255,20 +295,20 @@ export default function EvalPage() {
                 const val = currentEval.self_eval?.[item.id]
                 const n = val ? Number(val) : 0
                 return (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #f0f0f0" }}>
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border-light)" }}>
                     <span style={{ fontSize: 16 }}>{item.icon}</span>
-                    <span style={{ fontSize: 13, flex: 1, color: "#666" }}>{item.label}</span>
+                    <span style={{ fontSize: 13, flex: 1, color: "var(--text-body)" }}>{item.label}</span>
                     <div style={{ display: "flex", gap: 3 }}>
                       {Array.from({ length: 10 }, (_, i) => (
                         <div key={i} style={{
                           width: 24, height: 8, borderRadius: 4,
-                          background: n > i ? scoreColor(n * 10) : "#e8e8e8",
+                          background: n > i ? scoreColor(n * 10) : "var(--border)",
                         }} />
                       ))}
                     </div>
                     <span style={{
                       fontSize: 15, fontWeight: 800, minWidth: 36, textAlign: "right",
-                      color: val ? scoreColor(n * 10) : "#ddd",
+                      color: val ? scoreColor(n * 10) : "var(--text-label)",
                     }}>
                       {val ? `${val}/10` : "—"}
                     </span>
@@ -277,6 +317,123 @@ export default function EvalPage() {
               })}
             </Card>
           )}
+
+          {/* ── OKRs: Objetivos del Mes ──────────────────────────── */}
+          {(() => {
+            const okrs = Array.isArray(currentEval.okrs) ? currentEval.okrs : []
+            const avg  = okrs.length > 0
+              ? okrs.reduce((a, o) => a + Math.min(100, Math.max(0, Number(o.achievement) || 0)), 0) / okrs.length
+              : 0
+            return (
+              <SectionCard icon={Target} title={`Objetivos del Mes (OKRs) — ${MF[month]}`} style={{ marginBottom: 14 }}>
+                {okrs.length === 0 && !isCont && (
+                  <div style={{ padding: "18px 4px", color: "var(--text-label)", fontSize: 13, textAlign: "center" }}>
+                    Aún no se han definido objetivos para este mes.
+                  </div>
+                )}
+
+                {okrs.map((o, idx) => {
+                  const ach = Math.min(100, Math.max(0, Number(o.achievement) || 0))
+                  return (
+                    <div key={idx} style={{
+                      padding: "12px 0",
+                      borderBottom: idx < okrs.length - 1 ? "1px solid var(--border-light)" : "none",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          background: `${scoreColor(ach)}18`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 13, fontWeight: 800, color: scoreColor(ach), flexShrink: 0,
+                        }}>
+                          {idx + 1}
+                        </div>
+                        <input
+                          type="text"
+                          value={o.objective ?? ""}
+                          readOnly={!isCont}
+                          placeholder={isCont ? "Describe el objetivo…" : "(sin objetivo)"}
+                          onChange={e => updateOkr(idx, { objective: e.target.value })}
+                          style={{
+                            ...inputStyle, flex: 1, fontSize: 13, fontWeight: 600,
+                            border: isCont ? inputStyle.border : "1px solid transparent",
+                            background: isCont ? inputStyle.background : "transparent",
+                            cursor: isCont ? "text" : "default",
+                          }}
+                        />
+                        <span style={{
+                          fontSize: 16, fontWeight: 800, minWidth: 52, textAlign: "right",
+                          color: scoreColor(ach),
+                        }}>
+                          {Math.round(ach)}%
+                        </span>
+                        {isCont && (
+                          <button
+                            type="button"
+                            onClick={() => removeOkr(idx)}
+                            title="Eliminar objetivo"
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              color: "var(--text-label)", padding: 4, borderRadius: 6,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="range" min="0" max="100" step="5"
+                        value={ach}
+                        disabled={!isCont}
+                        onChange={e => updateOkr(idx, { achievement: Number(e.target.value) })}
+                        className="okr-slider"
+                        // CSS vars drive thumb color + gradient fill so the
+                        // track tint reflects the current achievement.
+                        style={{
+                          "--okr-accent": scoreColor(ach),
+                          "--okr-pct": `${ach}%`,
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+
+                {isCont && okrs.length < MAX_OKRS && (
+                  <button
+                    type="button"
+                    onClick={addOkr}
+                    style={{
+                      marginTop: 12,
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "8px 16px", borderRadius: 10,
+                      border: `1px dashed ${colors.brandPine}`,
+                      background: `${colors.brandPine}10`, color: colors.brandPine,
+                      cursor: "pointer", fontSize: 13, fontWeight: 700,
+                    }}
+                  >
+                    <Plus size={14} />
+                    Agregar objetivo ({okrs.length}/{MAX_OKRS})
+                  </button>
+                )}
+
+                {okrs.length > 0 && (
+                  <div style={{
+                    marginTop: 14, padding: "10px 14px", borderRadius: 10,
+                    background: LG,
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
+                      Logro promedio · {okrs.length} objetivo{okrs.length !== 1 ? "s" : ""}
+                    </span>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor(avg) }}>
+                      {Math.round(avg)}%
+                    </span>
+                  </div>
+                )}
+              </SectionCard>
+            )
+          })()}
 
           {/* ── Contadora eval: editable (isCont only) ───────────── */}
           {isCont && (
@@ -313,13 +470,13 @@ export default function EvalPage() {
                 const raw  = currentEval.metrics?.[cat.id]
                 const comp = calcMetric(cat, raw)
                 return (
-                  <div key={cat.id} style={{ padding: "14px 0", borderBottom: "1px solid #f0f0f0" }}>
+                  <div key={cat.id} style={{ padding: "14px 0", borderBottom: "1px solid var(--border-light)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                       <span style={{ fontSize: 22 }}>{cat.icon}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{cat.label}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-title)" }}>{cat.label}</div>
                         {cat.unit && (
-                          <div style={{ fontSize: 11, color: "#aaa" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-label)" }}>
                             {cat.type === "ct"
                               ? `${cat.free} gratuitos, luego −${cat.pen}pts c/u`
                               : cat.type === "count"
@@ -346,7 +503,7 @@ export default function EvalPage() {
                           style={{ ...inputStyle, width: 80, textAlign: "center", fontSize: 18, fontWeight: 700 }}
                           placeholder="0-100"
                         />
-                        <span style={{ fontSize: 12, color: "#aaa" }}>/ 100</span>
+                        <span style={{ fontSize: 12, color: "var(--text-label)" }}>/ 100</span>
                       </div>
                     ) : (
                       <Counter
@@ -369,15 +526,15 @@ export default function EvalPage() {
               return (
                 <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <span style={{ fontSize: 16 }}>{cat.icon}</span>
-                  <span style={{ fontSize: 12, width: 130, color: "#666", flexShrink: 0 }}>{cat.label}</span>
+                  <span style={{ fontSize: 12, width: 130, color: "var(--text-body)", flexShrink: 0 }}>{cat.label}</span>
                   <ProgressBar value={s ?? 0} />
                   <span style={{
                     fontSize: 13, fontWeight: 700, width: 34, textAlign: "right",
-                    color: s != null ? scoreColor(s) : "#ddd",
+                    color: s != null ? scoreColor(s) : "var(--text-label)",
                   }}>
                     {s != null ? Math.round(s) : "—"}
                   </span>
-                  <span style={{ fontSize: 10, color: "#bbb", width: 28 }}>{cat.weight}%</span>
+                  <span style={{ fontSize: 10, color: "var(--text-label)", width: 28 }}>{cat.weight}%</span>
                 </div>
               )
             })}
@@ -385,10 +542,11 @@ export default function EvalPage() {
               padding: 16, background: LG, borderRadius: 14,
               display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10,
             }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: DG }}>Total</span>
+              {/* Light pastel "Total" pill: force dark text for AA contrast in any theme. */}
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Total</span>
               <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor(moScore) }}>
                 {Math.round(moScore)}
-                <span style={{ fontSize: 13, color: "#999" }}>/100</span>
+                <span style={{ fontSize: 13, color: "#6b7280" }}>/100</span>
               </span>
             </div>
           </Card>

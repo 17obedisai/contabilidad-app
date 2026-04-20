@@ -2,10 +2,40 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from bson import ObjectId
 from app.db.connection import get_database
+from app.db.helpers import doc_to_dict
 from app.core.security import verify_password, hash_password, create_access_token
 from app.core.dependencies import verify_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+@router.get("/profiles")
+async def get_profiles():
+    """
+    Public endpoint: returns minimal public profile info for the login screen.
+    Never returns password hashes or any sensitive field.
+    """
+    db = get_database()
+    cursor = db.users.find(
+        {},
+        {"password_hash": 0},
+    )
+    items = []
+    async for doc in cursor:
+        d = doc_to_dict(doc)
+        items.append({
+            "id":     d.get("id"),
+            "nick":   d.get("nick"),
+            "name":   d.get("name"),
+            "role":   d.get("role"),
+            "emoji":  d.get("emoji", "👤"),
+            "level":  d.get("level", 3),
+            "isCont": bool(d.get("isCont", False)),
+            "noQuiz": bool(d.get("noQuiz", False)),
+        })
+    # Sort by level then name for a stable, hierarchical display
+    items.sort(key=lambda u: (u.get("level", 99), u.get("name", "")))
+    return items
 
 
 class LoginRequest(BaseModel):

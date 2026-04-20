@@ -9,6 +9,8 @@ import BoardPage from "./pages/BoardPage"
 import QuizPage from "./pages/QuizPage"
 import RankingPage from "./pages/RankingPage"
 import TeamPage from "./pages/TeamPage"
+import CalendarPage from "./pages/CalendarPage"
+import ExecutiveDashboard from "./pages/ExecutiveDashboard"
 
 function PrivateRoute({ children }) {
   const { token } = useAuth()
@@ -44,8 +46,10 @@ function AppContent() {
         <Route path="/eval"    element={<PrivateRoute><EvalPage /></PrivateRoute>} />
         <Route path="/prod"    element={<PrivateRoute><ProdPage /></PrivateRoute>} />
         <Route path="/board"   element={<PrivateRoute><BoardPage /></PrivateRoute>} />
+        <Route path="/calendar" element={<PrivateRoute><CalendarPage /></PrivateRoute>} />
         <Route path="/quiz"    element={<PrivateRoute><QuizPage /></PrivateRoute>} />
         <Route path="/ranking" element={<PrivateRoute><RankingPage /></PrivateRoute>} />
+        <Route path="/dashboard" element={<AdminRoute><ExecutiveDashboard /></AdminRoute>} />
         <Route path="/team"    element={<AdminRoute><TeamPage /></AdminRoute>} />
         <Route path="*"        element={<Navigate to="/login" replace />} />
       </Routes>

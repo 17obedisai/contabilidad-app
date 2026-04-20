@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { Users, Plus, Pencil, Trash2, X, Check, UserPlus, Shield, User } from "lucide-react"
+import { Users, Plus, Pencil, Trash2, X, Check, UserPlus, Shield, User, KeyRound } from "lucide-react"
 import { useAuth } from "../context/AuthContext"
 import api from "../services/api"
 import Layout from "../components/Layout"
@@ -34,7 +34,7 @@ function levelColor(level) {
   return map[level] || colors.textLabel
 }
 
-const EMPTY_FORM = { nick: "", name: "", role: "", emoji: "👤", level: 3, password: "coocentral25", noQuiz: false }
+const EMPTY_FORM = { nick: "", name: "", role: "", birthday: "", emoji: "👤", level: 3, password: "coocentral25", noQuiz: false }
 
 export default function TeamPage() {
   const { user } = useAuth()
@@ -48,6 +48,10 @@ export default function TeamPage() {
   const [newError, setNewError]     = useState("")
   const [saving, setSaving]         = useState(false)
   const [confirmDeleteMember, setConfirmDeleteMember] = useState(null) // { id, name }
+  const [pwMember, setPwMember]     = useState(null) // { id, name }
+  const [pwValue, setPwValue]       = useState("")
+  const [pwError, setPwError]       = useState("")
+  const [pwSaving, setPwSaving]     = useState(false)
 
   // Guard: only contadora
   if (!user?.isCont) {
@@ -78,6 +82,9 @@ export default function TeamPage() {
     if (!newForm.nick.trim() || !newForm.name.trim() || !newForm.role.trim()) {
       setNewError("Nick, nombre y rol son obligatorios."); return
     }
+    if (!newForm.birthday || !/^\d{4}-\d{2}-\d{2}$/.test(newForm.birthday)) {
+      setNewError("La fecha de cumpleaños es obligatoria."); return
+    }
     setSaving(true)
     try {
       const res = await api.post("/api/users", newForm)
@@ -94,7 +101,11 @@ export default function TeamPage() {
   // ── Update ───────────────────────────────────────────────────────────────
   function startEdit(m) {
     setEditId(m.id)
-    setEditForm({ name: m.name, role: m.role, emoji: m.emoji ?? "👤", level: m.level ?? 3, noQuiz: m.noQuiz ?? false })
+    setEditForm({
+      name: m.name, role: m.role, emoji: m.emoji ?? "👤",
+      level: m.level ?? 3, noQuiz: m.noQuiz ?? false,
+      birthday: m.birthday ?? "",
+    })
   }
 
   async function saveEdit(id) {
@@ -108,6 +119,31 @@ export default function TeamPage() {
       toast.error(err?.response?.data?.detail || "Error al guardar")
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ── Admin reset password ────────────────────────────────────────────────
+  function openPwModal(m) {
+    setPwMember({ id: m.id, name: m.name })
+    setPwValue("")
+    setPwError("")
+  }
+
+  async function submitPassword() {
+    if (pwValue.trim().length < 6) {
+      setPwError("Mínimo 6 caracteres")
+      return
+    }
+    setPwSaving(true)
+    try {
+      await api.put(`/api/users/${pwMember.id}/password`, { new_password: pwValue })
+      toast.success(`Contraseña actualizada para ${pwMember.name}`)
+      setPwMember(null)
+      setPwValue("")
+    } catch (err) {
+      setPwError(err?.response?.data?.detail || "Error al cambiar la contraseña")
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -177,7 +213,7 @@ export default function TeamPage() {
               const lc = levelColor(m.level)
 
               return (
-                <div key={m.id} style={{
+                <div key={m.id} className="team-row" style={{
                   padding: "16px 20px",
                   borderBottom: idx < members.length - 1 ? `1px solid ${colors.border}` : "none",
                   display: "flex", alignItems: isEditing ? "flex-start" : "center",
@@ -226,6 +262,12 @@ export default function TeamPage() {
                             {Object.entries(LEVEL_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
                         </div>
+                        <div style={{ flex: "1 1 160px" }}>
+                          <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Cumpleaños</div>
+                          <input type="date" value={editForm.birthday ?? ""}
+                            onChange={e => setEditForm(f => ({ ...f, birthday: e.target.value }))}
+                            style={{ ...inputStyle }} />
+                        </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 20 }}>
                           <input type="checkbox" id={`nq-${m.id}`} checked={editForm.noQuiz}
                             onChange={e => setEditForm(f => ({ ...f, noQuiz: e.target.checked }))} />
@@ -254,20 +296,28 @@ export default function TeamPage() {
                         <div style={{ fontSize: 13, color: colors.textLabel, marginTop: 2 }}>
                           @{m.nick} · {m.role}
                         </div>
-                        <div style={{ marginTop: 4 }}>
+                        <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                           <span style={{
                             fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20,
                             background: `${lc}10`, color: lc,
                           }}>
                             {LEVEL_LABELS[m.level] ?? `Nivel ${m.level}`}
                           </span>
+                          {m.birthday && (
+                            <span style={{
+                              fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20,
+                              background: `${colors.brandPine}10`, color: colors.brandPine,
+                            }}>
+                              🎂 {new Date(m.birthday).toLocaleDateString("es-CO", { day: "2-digit", month: "long", timeZone: "UTC" })}
+                            </span>
+                          )}
                         </div>
                       </>
                     )}
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <div className="team-actions" style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     {isEditing ? (
                       <>
                         <button type="button" disabled={saving} onClick={() => saveEdit(m.id)} style={{
@@ -300,6 +350,19 @@ export default function TeamPage() {
                           onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textLabel }}
                         >
                           <Pencil size={14} />
+                        </button>
+                        <button type="button" onClick={() => openPwModal(m)} style={{
+                          padding: "8px 10px", borderRadius: radius.md,
+                          border: `1px solid ${colors.border}`, background: colors.bgCard,
+                          cursor: "pointer", color: colors.textLabel,
+                          display: "flex", alignItems: "center",
+                          transition: "border-color 0.15s",
+                        }}
+                          title="Cambiar contraseña"
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = colors.info; e.currentTarget.style.color = colors.info }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textLabel }}
+                        >
+                          <KeyRound size={14} />
                         </button>
                         {!isSelf && (
                           <button type="button" onClick={() => setConfirmDeleteMember({ id: m.id, name: m.name })} style={{
@@ -364,6 +427,19 @@ export default function TeamPage() {
             </div>
           </div>
           <div>
+            <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Fecha de cumpleaños *</div>
+            <input
+              type="date"
+              required
+              value={newForm.birthday}
+              onChange={e => setNewForm(f => ({ ...f, birthday: e.target.value }))}
+              style={{ ...inputStyle }}
+            />
+            <div style={{ fontSize: 11, color: colors.textLabel, marginTop: 4 }}>
+              Se mostrará en el calendario del equipo.
+            </div>
+          </div>
+          <div>
             <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Contraseña inicial</div>
             <input value={newForm.password} onChange={e => setNewForm(f => ({ ...f, password: e.target.value }))}
               placeholder="Mínimo 6 caracteres" style={{ ...inputStyle }} />
@@ -408,6 +484,55 @@ export default function TeamPage() {
         onConfirm={() => handleDelete(confirmDeleteMember?.id)}
         onCancel={() => setConfirmDeleteMember(null)}
       />
+
+      {/* Reset password modal */}
+      <Modal
+        open={!!pwMember}
+        onClose={() => { setPwMember(null); setPwValue(""); setPwError("") }}
+        title={`Cambiar contraseña · ${pwMember?.name ?? ""}`}
+        maxWidth={420}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 13, color: colors.textLabel }}>
+            Define una nueva contraseña para este miembro. Podrá usarla de inmediato en el login.
+          </div>
+          <div>
+            <div style={{ ...typography.labelStyle, marginBottom: 4 }}>Nueva contraseña *</div>
+            <input
+              type="text"
+              autoFocus
+              value={pwValue}
+              onChange={e => { setPwValue(e.target.value); setPwError("") }}
+              placeholder="Mínimo 6 caracteres"
+              style={{ ...inputStyle }}
+              onKeyDown={e => { if (e.key === "Enter") submitPassword() }}
+            />
+          </div>
+          {pwError && (
+            <div style={{
+              padding: "10px 14px", borderRadius: 8,
+              background: `${colors.danger}10`, color: colors.danger, fontSize: 13,
+            }}>
+              {pwError}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={submitPassword}
+            disabled={pwSaving}
+            style={{
+              padding: "12px 20px", borderRadius: 10, border: "none",
+              cursor: pwSaving ? "wait" : "pointer", fontSize: 14, fontWeight: 700,
+              background: colors.brandPine, color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              opacity: pwSaving ? 0.7 : 1,
+            }}
+          >
+            <KeyRound size={16} />
+            {pwSaving ? "Guardando…" : "Actualizar contraseña"}
+          </button>
+        </div>
+      </Modal>
     </Layout>
   )
 }

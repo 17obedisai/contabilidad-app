@@ -32,8 +32,8 @@ def _task_score(tasks: list) -> float:
 async def get_ranking(year: int, token: dict = Depends(verify_token)):
     db = get_database()
 
-    # Load all users
-    users = {str(u["_id"]): u async for u in db.users.find({})}
+    # Load all non-admin users (Contadora/admin is not ranked)
+    users = {str(u["_id"]): u async for u in db.users.find({"isCont": {"$ne": True}})}
 
     # Quiz scores grouped by userId
     quiz_scores: dict[str, list] = {}

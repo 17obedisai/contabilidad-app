@@ -7,6 +7,7 @@ import Card from "../components/ui/Card"
 import Button from "../components/ui/Button"
 import RadialScore from "../components/ui/RadialScore"
 import ConfirmModal from "../components/ui/ConfirmModal"
+import QuizEditor from "./QuizEditor"
 import { G, DG, LG, BD, scoreColor } from "../constants/theme"
 
 const YEAR  = new Date().getFullYear()
@@ -34,6 +35,12 @@ function fmt(secs) {
 
 export default function QuizPage() {
   const { user } = useAuth()
+
+  // Contadora (admin) ve el editor de quizzes en vez del quiz
+  if (user?.isCont === true) {
+    return <QuizEditor />
+  }
+
   const isNoQuiz = user?.noQuiz
 
   // screen: "start" | "quiz" | "result"
@@ -157,7 +164,7 @@ export default function QuizPage() {
             <div style={{ fontSize: 22, fontWeight: 700, color: DG, marginBottom: 6 }}>
               Quiz {MS[MONTH - 1]}
             </div>
-            <div style={{ fontSize: 14, color:"#888", marginBottom: 24 }}>
+            <div style={{ fontSize: 14, color: "var(--text-label)", marginBottom: 24 }}>
               15 preguntas · tiempo libre · sin penalización por error
             </div>
 
@@ -168,14 +175,14 @@ export default function QuizPage() {
             ) : existing ? (
               <div>
                 <div style={{ padding:"16px 24px", background: LG, borderRadius: 10, marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, color:"#888", marginBottom: 4 }}>Ya completaste este quiz</div>
+                  <div style={{ fontSize: 13, color: "var(--text-body)", marginBottom: 4 }}>Ya completaste este quiz</div>
                   <div style={{ fontSize: 32, fontWeight: 700, color: scoreColor(existing.score) }}>
                     {existing.correct}/{existing.total}
                   </div>
                   <div style={{ fontSize: 16, color: scoreColor(existing.score) }}>
                     {existing.score.toFixed(1)}%
                   </div>
-                  <div style={{ fontSize: 12, color:"#aaa", marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-label)", marginTop: 4 }}>
                     Tiempo: {fmt(Math.round(existing.time ?? 0))}
                   </div>
                 </div>
@@ -204,13 +211,13 @@ export default function QuizPage() {
                   <div style={{ fontSize: 18 }}>{r.emoji}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: DG }}>{r.nick}</div>
-                    <div style={{ fontSize: 11, color:"#aaa" }}>{fmt(Math.round(r.time ?? 0))}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-label)" }}>{fmt(Math.round(r.time ?? 0))}</div>
                   </div>
                   <div style={{ textAlign:"right" }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: scoreColor(r.score) }}>
                       {r.score.toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: 11, color:"#888" }}>{r.correct}/{r.total}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-label)" }}>{r.correct}/{r.total}</div>
                   </div>
                 </div>
               ))}
@@ -232,7 +239,7 @@ export default function QuizPage() {
         <div style={{ maxWidth: 700, margin: "0 auto" }}>
           {/* Header */}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color:"#888" }}>
+            <span style={{ fontSize: 13, color: "var(--text-label)" }}>
               {answered}/{questions.length} respondidas
             </span>
             <span style={{ fontSize: 20, fontWeight: 700, color: DG, fontFamily:"monospace" }}>
@@ -246,38 +253,42 @@ export default function QuizPage() {
               <button key={i} onClick={() => setCurrent(i)} style={{
                 width: 28, height: 28, borderRadius: "50%", border: "none",
                 cursor:"pointer", fontSize: 11, fontWeight: 700,
-                background: i === current ? DG : answers[i] !== null ? G : "#ddd",
-                color: (i === current || answers[i] !== null) ? "#fff" : "#888",
+                background: i === current ? DG : answers[i] !== null ? G : "var(--border)",
+                color: (i === current || answers[i] !== null) ? "#fff" : "var(--text-label)",
               }}>{i + 1}</button>
             ))}
           </div>
 
           {/* Question card */}
           <Card style={{ marginBottom: 16, padding: 24 }}>
-            <div style={{ fontSize: 12, color:"#aaa", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 8 }}>
               Pregunta {current + 1} de {questions.length}
             </div>
             <div style={{ fontSize: 17, fontWeight: 600, color: DG, lineHeight: 1.5, marginBottom: 24 }}>
               {q.text}
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap: 10 }}>
-              {q.options.map((opt, i) => (
-                <button key={i} onClick={() => selectAnswer(i)} style={{
-                  display:"flex", alignItems:"center", gap: 12,
-                  padding:"12px 16px", borderRadius: 10,
-                  border:`2px solid ${answers[current]===i ? G : BD}`,
-                  background: answers[current]===i ? LG : "#fff",
-                  cursor:"pointer", textAlign:"left",
-                }}>
-                  <span style={{
-                    width: 28, height: 28, borderRadius: "50%", display:"flex",
-                    alignItems:"center", justifyContent:"center", fontSize: 13, fontWeight: 700,
-                    background: answers[current]===i ? G : "#eee",
-                    color: answers[current]===i ? "#fff" : "#888", flexShrink: 0,
-                  }}>{OPTS[i]}</span>
-                  <span style={{ fontSize: 14, color: DG }}>{opt}</span>
-                </button>
-              ))}
+              {q.options.map((opt, i) => {
+                const isSel = answers[current] === i
+                return (
+                  <button key={i} onClick={() => selectAnswer(i)} style={{
+                    display:"flex", alignItems:"center", gap: 12,
+                    padding:"12px 16px", borderRadius: 10,
+                    border:`2px solid ${isSel ? G : "var(--border)"}`,
+                    background: isSel ? LG : "var(--bg-card)",
+                    cursor:"pointer", textAlign:"left",
+                    transition: "background 0.15s, border-color 0.15s",
+                  }}>
+                    <span style={{
+                      width: 28, height: 28, borderRadius: "50%", display:"flex",
+                      alignItems:"center", justifyContent:"center", fontSize: 13, fontWeight: 700,
+                      background: isSel ? G : "var(--bg-secondary)",
+                      color: isSel ? "#fff" : "var(--text-label)", flexShrink: 0,
+                    }}>{OPTS[i]}</span>
+                    <span style={{ fontSize: 14, color: isSel ? "#111827" : "var(--text-title)" }}>{opt}</span>
+                  </button>
+                )
+              })}
             </div>
           </Card>
 
@@ -328,10 +339,10 @@ export default function QuizPage() {
             <div style={{ display:"flex", justifyContent:"center", marginBottom: 16 }}>
               <RadialScore score={result.score} size={120} />
             </div>
-            <div style={{ fontSize: 18, color:"#555" }}>
+            <div style={{ fontSize: 18, color: "var(--text-body)" }}>
               {result.correct} de {result.total} correctas
             </div>
-            <div style={{ fontSize: 13, color:"#aaa", marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: "var(--text-label)", marginTop: 4 }}>
               Tiempo: {fmt(elapsed)}
             </div>
           </Card>
@@ -345,12 +356,12 @@ export default function QuizPage() {
               {result.feedback.map((f, i) => (
                 <div key={i} style={{
                   padding:"12px 16px", borderBottom: i < result.feedback.length-1 ? `1px solid ${BD}` : "none",
-                  background: f.isCorrect ? "#f0fff4" : "#fff5f5",
+                  background: f.isCorrect ? "rgba(39, 174, 96, 0.12)" : "rgba(231, 76, 60, 0.10)",
                 }}>
                   <div style={{ display:"flex", gap: 8, alignItems:"flex-start" }}>
                     <span style={{ fontSize: 16, flexShrink: 0 }}>{f.isCorrect ? "✅" : "❌"}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: DG, marginBottom: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-title)", marginBottom: 6 }}>
                         {i + 1}. {f.text}
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap: 3 }}>
@@ -359,9 +370,9 @@ export default function QuizPage() {
                           const isCorrect  = oi === f.correct
                           let bg = "transparent"
                           let fw = 400
-                          let color = "#555"
-                          if (isCorrect) { bg = "#e8f5e9"; color = "#27ae60"; fw = 700 }
-                          if (isSelected && !isCorrect) { bg = "#fdecea"; color = "#e74c3c"; fw = 700 }
+                          let color = "var(--text-body)"
+                          if (isCorrect) { bg = "rgba(39, 174, 96, 0.18)"; color = "#16a34a"; fw = 700 }
+                          if (isSelected && !isCorrect) { bg = "rgba(231, 76, 60, 0.18)"; color = "#dc2626"; fw = 700 }
                           return (
                             <div key={oi} style={{
                               display:"flex", gap: 6, alignItems:"center",
@@ -369,8 +380,8 @@ export default function QuizPage() {
                             }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color, width: 20 }}>{OPTS[oi]}</span>
                               <span style={{ fontSize: 13, color, fontWeight: fw }}>{opt}</span>
-                              {isSelected && !isCorrect && <span style={{ marginLeft:"auto", fontSize: 12 }}>← tu respuesta</span>}
-                              {isCorrect && <span style={{ marginLeft:"auto", fontSize: 12 }}>← correcta</span>}
+                              {isSelected && !isCorrect && <span style={{ marginLeft:"auto", fontSize: 12, color }}>← tu respuesta</span>}
+                              {isCorrect && <span style={{ marginLeft:"auto", fontSize: 12, color }}>← correcta</span>}
                             </div>
                           )
                         })}

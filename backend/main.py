@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.db.connection import connect_db, close_db
-from app.routes import auth, evaluations, tasks, board, quiz, ranking, users
+from app.routes import auth, evaluations, tasks, board, quiz, ranking, users, reminders
 from app.core.config import settings
 
 
@@ -30,3 +30,4 @@ app.include_router(board.router)
 app.include_router(quiz.router)
 app.include_router(ranking.router)
 app.include_router(users.router)
+app.include_router(reminders.router)
